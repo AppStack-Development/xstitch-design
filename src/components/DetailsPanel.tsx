@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { Icon } from './Icon';
 import type { Pattern, PatternDetails } from '../types';
 import { BASE_LABEL, DIFFICULTY_LABEL, STITCH_LABEL, defaultDetails } from '../lib/pattern';
 import { computeStats, fmtInch, fmtMm, needleHint } from '../lib/stats';
@@ -12,9 +13,11 @@ const DEF = defaultDetails();
 interface Props {
   pattern: Pattern;
   onChange: (patch: Partial<Pattern>) => void;
+  /** opens "Size and model" */
+  onResize?: () => void;
 }
 
-export function DetailsPanel({ pattern: p, onChange }: Props) {
+export function DetailsPanel({ pattern: p, onChange, onResize }: Props) {
   const d = p.details;
   const stats = useMemo(() => computeStats(p), [p]);
   const [tagText, setTagText] = useState(d.tags.join(', '));
@@ -41,6 +44,9 @@ export function DetailsPanel({ pattern: p, onChange }: Props) {
         <div><b>{stats.total.toLocaleString()}</b><span>{t(<>ฝีเข็ม / {stats.holes.toLocaleString()} ช่องปักได้</>, <>stitches / {stats.holes.toLocaleString()} stitchable cells</>)}</span></div>
         <div><b>{used.length}</b><span>{t(<>สี · ~{skeins.toFixed(1)} ไจ</>, <>{used.length === 1 ? 'color' : 'colors'} · ~{skeins.toFixed(1)} skeins</>)}</span></div>
       </section>
+      {onResize && (
+        <button className="btn sm resize-btn" onClick={onResize}><Icon name="resize" size={15} /> {t('ปรับขนาด / เปลี่ยนแบบ', 'Resize / change model')}</button>
+      )}
 
       <h4>{t('ข้อมูลลาย', 'Pattern info')}</h4>
       <label>{t('ชื่อลาย', 'Pattern name')}<input value={p.name} onChange={(e) => onChange({ name: e.target.value })} /></label>

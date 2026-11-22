@@ -14,6 +14,9 @@ import { PalettePanel } from '../components/PalettePanel';
 import { DetailsPanel } from '../components/DetailsPanel';
 import { TransferDialog } from '../components/TransferDialog';
 import { TextDialog } from '../components/TextDialog';
+import { ResizeDialog } from '../components/ResizeDialog';
+import { savePattern } from '../lib/storage';
+import { uid } from '../lib/threads';
 import { ToolSheet, type SheetSection } from '../components/ToolSheet';
 import { EditorTip, type CoachTarget } from '../components/EditorTip';
 import { StlImportNote } from '../components/StlImportNote';
@@ -30,7 +33,16 @@ import { computeProgress, reconcileProgress } from '../lib/progress';
 import { navigate } from '../App';
 import { t } from '../lib/i18n';
 
-type Snap = Pick<Pattern, 'cells' | 'mask' | 'palette'>;
+// an undo step: the stitches and the grid they sit on (only a resize changes the grid, so it is safe to
+// restore). A resize step ("full") also remembers spacing, details and progress; ordinary steps leave those
+// alone, so undoing a stitch never reverts a description or fabric choice made in between.
+type Snap = Pick<Pattern, 'cells' | 'mask' | 'palette' | 'cols' | 'rows' | 'mode' | 'templateId' | 'templateName'>
+  & Partial<Pick<Pattern, 'pitchMm' | 'details' | 'progress'>> & { full?: true };
+const snap = (p: Pattern, full = false): Snap => ({
+  cells: p.cells, mask: p.mask, palette: p.palette, cols: p.cols, rows: p.rows,
+  mode: p.mode, templateId: p.templateId, templateName: p.templateName,
+  ...(full ? { full: true as const, pitchMm: p.pitchMm, details: p.details, progress: p.progress } : {}),
+});
 
 /**
  * `short` is the visible name (phone tool bar / "More" sheet). `phone` tools stay in the phone's
@@ -80,6 +92,8 @@ export function Editor({ id }: { id: string }) {
   const [publish, setPublish] = useState(false);
   const [order, setOrder] = useState(false);
   const [textDlg, setTextDlg] = useState(false);
+  /** "Size and model" dialog */
+  const [resizing, setResizing] = useState(false);
   /** phone "More" tools sheet */
   const [moreOpen, setMoreOpen] = useState(false);
   const closeMore = useCallback(() => setMoreOpen(false), []);
@@ -113,21 +127,26 @@ export function Editor({ id }: { id: string }) {
   const current = useRef(pattern);
   current.current = pattern;
 
-  const snapshot = useCallback(() => {
+  const pushUndo = useCallback((full: boolean) => {
     const p = current.current;
     if (!p) return;
-    undo.current.push({ cells: p.cells, mask: p.mask, palette: p.palette });
+    undo.current.push(snap(p, full));
     if (undo.current.length > 150) undo.current.shift();
     redo.current = [];
     force((n) => n + 1);
   }, []);
+  // no arguments on purpose: it's handed straight to the canvas as onStrokeStart
+  const snapshot = useCallback(() => pushUndo(false), [pushUndo]);
+  /** before a resize or model change: remembers spacing, details and progress too */
+  const snapshotFull = useCallback(() => pushUndo(true), [pushUndo]);
 
   const restore = useCallback((from: React.MutableRefObject<Snap[]>, to: React.MutableRefObject<Snap[]>) => {
     const p = current.current;
     const s = from.current.pop();
     if (!p || !s) return;
-    to.current.push({ cells: p.cells, mask: p.mask, palette: p.palette });
-    const next = { ...p, ...s };
+    to.current.push(snap(p, !!s.full));
+    const { full: _full, ...fields } = s;
+    const next = { ...p, ...fields };
     current.current = next;
     setPattern(next);
   }, []);
@@ -231,6 +250,7 @@ export function Editor({ id }: { id: string }) {
         { key: 'text', icon: 'text', label: t('ใส่ชื่อ / ข้อความ', 'Name / text'), title: t('ใส่ชื่อ / ข้อความ (T)', 'Name / text (T)'), onSelect: () => setTextDlg(true) },
         // on phones the header button is hidden to give the pattern name room; it lives here instead
         { key: 'image', icon: 'image', label: t('รูปภาพ → ลาย', 'Image → pattern'), title: t('แปลงรูปภาพเป็นลายปัก', 'Turn an image into a pattern'), onSelect: () => setImgImport({ file: null }) },
+        { key: 'resize', icon: 'resize', label: t('ขนาดและแบบ', 'Size & model'), title: t('ปรับขนาด หรือเปลี่ยนแบบชิ้นงาน', 'Resize, or move to another model'), onSelect: () => setResizing(true) },
       ],
     },
     {
@@ -338,6 +358,7 @@ export function Editor({ id }: { id: string }) {
             </button>
           ))}
           <button className="tool tool-x" onClick={() => setTextDlg(true)} title={t('ใส่ชื่อ / ข้อความ (T)', 'Name / text (T)')}><Icon name="text" size={20} /></button>
+          <button className="tool tool-x" onClick={() => setResizing(true)} title={t('ขนาดและแบบ', 'Size and model')} aria-label={t('ขนาดและแบบ', 'Size and model')}><Icon name="resize" size={20} /></button>
           <div className="tool-sep" />
           <button className={'tool tool-x' + (mirrorX ? ' on' : '')} aria-pressed={mirrorX} onClick={() => setMirrorX(!mirrorX)} title={t('สมมาตรซ้าย-ขวา (X)', 'Mirror left-right (X)')}><Icon name="mirrorX" size={20} /></button>
           <button className={'tool tool-x' + (mirrorY ? ' on' : '')} aria-pressed={mirrorY} onClick={() => setMirrorY(!mirrorY)} title={t('สมมาตรบน-ล่าง (Y)', 'Mirror top-bottom (Y)')}><Icon name="mirrorY" size={20} /></button>
@@ -420,7 +441,7 @@ export function Editor({ id }: { id: string }) {
             <button className={tab === '3d' ? 'on' : ''} onClick={() => setTab('3d')}><Icon name="cube" size={16} /> 3D</button>
           </nav>
           {tab === 'palette' && <PalettePanel pattern={p} active={active} setActive={setActive} onPalette={onPalette} />}
-          {tab === 'details' && <DetailsPanel pattern={p} onChange={(patch) => setPattern({ ...p, ...patch })} />}
+          {tab === 'details' && <DetailsPanel pattern={p} onChange={(patch) => setPattern({ ...p, ...patch })} onResize={() => setResizing(true)} />}
           {tab === '3d' && (
             <Suspense fallback={<div className="preview3d"><p className="muted">{t('กำลังโหลดภาพ 3 มิติ…', 'Loading 3D view…')}</p></div>}>
               <Preview3D pattern={p} />
@@ -451,6 +472,21 @@ export function Editor({ id }: { id: string }) {
         <PublishDialog pattern={p} onClose={() => setPublish(false)}
           // keep the link in the editor's copy too, or the next autosave would drop it
           onPublished={(_, postId) => setPattern((cur) => (cur ? { ...cur, postId } : cur))} />
+      )}
+      {resizing && (
+        <ResizeDialog pattern={p} onClose={() => setResizing(false)} onApply={(next, keepCopy) => {
+          if (keepCopy) {
+            const now = Date.now();
+            savePattern({ ...p, id: uid(), postId: undefined, name: p.name + t(' (ขนาดเดิม)', ' (original size)'), createdAt: now, updatedAt: now });
+          }
+          snapshotFull();
+          current.current = next;
+          setPattern(next);
+          setResizing(false);
+          setTimeout(() => canvas.current?.fit(), 0);
+          flash(keepCopy ? t('เปลี่ยนแล้ว · เก็บลายเดิมไว้ในลายของฉัน', 'Done · the original is in My patterns')
+            : t('เปลี่ยนแล้ว · กดเลิกทำเพื่อย้อนกลับได้', 'Done · undo to go back'));
+        }} />
       )}
       {textDlg && (
         <TextDialog
