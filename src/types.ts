@@ -17,6 +17,8 @@ export interface ThreadColor {
 
 export type StitchType = 'cross' | 'half' | 'tent' | 'fill';
 export type BaseType = 'print3d' | 'aida' | 'plastic-canvas' | 'other';
+/** which counted fabric a baseType 'aida' pattern is stitched on (lib/fabrics.ts) */
+export type FabricKind = 'aida' | 'evenweave' | 'linen' | 'hardanger' | 'waste' | 'paper';
 export type Difficulty = 'easy' | 'medium' | 'hard';
 
 export interface PatternDetails {
@@ -31,7 +33,12 @@ export interface PatternDetails {
   needleType: string;
   needleSize: string;
   baseType: BaseType;
+  /** fabric count: squares per inch (Aida-like) or threads per inch (evenweave, linen) */
   aidaCount: number;
+  /** the counted fabric, when baseType is 'aida' */
+  fabric: FabricKind;
+  /** how many fabric threads one stitch crosses (evenweave/linen are usually stitched over 2) */
+  over: 1 | 2;
   filament: string;
   filamentColor: string;
   thicknessMm: number;

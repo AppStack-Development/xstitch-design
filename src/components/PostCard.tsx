@@ -90,7 +90,7 @@ export function PostCard({ post, liked, onLike }: { post: Post; liked: boolean; 
     <article className="sample-card post-card">
       <a className="sample-thumb" href={href} aria-label={post.title}>
         {p ? <Thumb pattern={p} max={150} view="stitch" /> : <span className="post-wait" aria-hidden="true" />}
-        <span className={`sample-kind ${post.base}`}>{post.base === 'aida' ? t('ผ้า Aida', 'Aida') : '3D'}</span>
+        <span className={`sample-kind ${post.base}`}>{post.base === 'aida' ? t('บนผ้า', 'Fabric') : '3D'}</span>
       </a>
       <div className="sample-body">
         <h3><a href={href}>{post.title}</a></h3>

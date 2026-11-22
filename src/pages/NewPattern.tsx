@@ -14,6 +14,8 @@ import { DefaultTag, FieldHead, sameValue } from '../components/DefaultTag';
 import { navigate } from '../App';
 import { t } from '../lib/i18n';
 import { suggestNeedle } from '../components/needleSuggest';
+import { FabricPicker, type FabricValue } from '../components/FabricPicker';
+import { fabricPitch } from '../lib/fabrics';
 
 const blank = (cols: number, rows: number, mask: string, baseType: BaseType = 'print3d') => ({
   cols, rows, mask, cells: new Array(cols * rows).fill(-1), palette: [],
@@ -49,15 +51,16 @@ function FreeForm() {
   const [cols, setCols] = useState(FREE_DEF.cols);
   const [rows, setRows] = useState(FREE_DEF.rows);
   const [base, setBase] = useState<BaseType>(FREE_DEF.base);
-  const [count, setCount] = useState(FREE_DEF.count);
+  const [fab, setFab] = useState<FabricValue>({ fabric: 'aida', count: FREE_DEF.count, over: 1 });
   const [pitch, setPitch] = useState(FREE_DEF.pitch);
-  const pitchMm = base === 'aida' ? 25.4 / count : base === 'plastic-canvas' ? 25.4 / 7 : pitch;
+  const pitchMm = base === 'aida' ? fabricPitch(fab.count, fab.over) : base === 'plastic-canvas' ? 25.4 / 7 : pitch;
+  const sug = base === 'aida' ? suggestNeedle(pitchMm, fab) : suggestNeedle(pitchMm);
   const clamp = (v: number) => Math.max(4, Math.min(200, Math.round(v) || 4));
 
   const create = () => {
     const p = createPattern({
       name, mode: 'free', cols, rows, mask: freeMask(cols, rows), pitchMm: +pitchMm.toFixed(3),
-      details: { baseType: base, aidaCount: count, needleSize: suggestNeedle(pitchMm).size, strands: suggestNeedle(pitchMm).strand },
+      details: { baseType: base, ...(base === 'aida' ? { fabric: fab.fabric, aidaCount: fab.count, over: fab.over } : {}), needleSize: sug.size, strands: sug.strand },
     });
     savePattern(p);
     navigate(`#/edit/${p.id}`);
@@ -78,23 +81,17 @@ function FreeForm() {
         </div>
         <label><FieldHead label={t('พื้นที่จะใช้ปัก', 'Stitch on')}><DefaultTag value={base} def={FREE_DEF.base} onReset={() => setBase(FREE_DEF.base)} /></FieldHead>
           <select value={base} onChange={(e) => setBase(e.target.value as BaseType)}>
-            <option value="aida">{t('ผ้า Aida', 'Aida fabric')}</option>
+            <option value="aida">{t('ผ้า (Aida, ลินิน และอื่น ๆ)', 'Fabric (Aida, linen and more)')}</option>
             <option value="plastic-canvas">{t('แผ่น Plastic canvas (7 ct)', 'Plastic canvas (7 ct)')}</option>
             <option value="print3d">{t('ชิ้นงานพิมพ์ 3 มิติ', '3D-printed piece')}</option>
             <option value="other">{t('อื่นๆ (กำหนดระยะเอง)', 'Other (custom spacing)')}</option>
           </select>
         </label>
-        {base === 'aida' && (
-          <label><FieldHead label={t('ความถี่ผ้า', 'Fabric count')}><DefaultTag value={count} def={FREE_DEF.count} onReset={() => setCount(FREE_DEF.count)} /></FieldHead>
-            <select value={count} onChange={(e) => setCount(+e.target.value)}>
-              {[11, 14, 16, 18, 20].map((c) => <option key={c} value={c}>{c} ct</option>)}
-            </select>
-          </label>
-        )}
+        {base === 'aida' && <FabricPicker value={fab} onChange={setFab} cols={cols} rows={rows} />}
         {(base === 'print3d' || base === 'other') && (
           <label><FieldHead label={t('ระยะห่างระหว่างช่อง (มม.)', 'Cell spacing (mm)')}><DefaultTag value={pitch} def={FREE_DEF.pitch} onReset={() => setPitch(FREE_DEF.pitch)} /></FieldHead><input type="number" step={0.1} min={0.8} max={10} value={pitch} onChange={(e) => setPitch(within(+e.target.value, 0.8, 10, 3))} /></label>
         )}
-        <p className="hint">{t(<>ขนาดชิ้นงานจริง ≈ {(cols * pitchMm).toFixed(0)} × {(rows * pitchMm).toFixed(0)} มม.</>, <>Finished size ≈ {(cols * pitchMm).toFixed(0)} × {(rows * pitchMm).toFixed(0)} mm</>)} · {needleHint(pitchMm)}</p>
+        {base !== 'aida' && <p className="hint">{t(<>ขนาดชิ้นงานจริง ≈ {(cols * pitchMm).toFixed(0)} × {(rows * pitchMm).toFixed(0)} มม.</>, <>Finished size ≈ {(cols * pitchMm).toFixed(0)} × {(rows * pitchMm).toFixed(0)} mm</>)} · {needleHint(pitchMm)}</p>}
         <button className="btn primary lg" onClick={create}>{t('สร้างลาย', 'Create pattern')} <Icon name="check" size={16} /></button>
       </div>
       <div className="preview-card">

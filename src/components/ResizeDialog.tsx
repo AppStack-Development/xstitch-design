@@ -3,6 +3,8 @@ import type { Pattern } from '../types';
 import { TEMPLATES, freeMask, templateLabel, type TemplateDef } from '../lib/templates';
 import { anchorAt, applyFit, canCarry, clampPlace, droppedColors, planFit, templateDims, type FitMode, type Place, type Target } from '../lib/resize';
 import { suggestNeedle } from './needleSuggest';
+import { FabricPicker, type FabricValue } from './FabricPicker';
+import { fabricDef, fabricLabel, fabricOf, fabricPatch } from '../lib/fabrics';
 import { Thumb } from './Thumb';
 import { Icon } from './Icon';
 import { t } from '../lib/i18n';
@@ -14,7 +16,13 @@ import { t } from '../lib/i18n';
  */
 type Kind = { kind: 'free' } | { kind: 'tpl'; def: TemplateDef } | { kind: 'fixed' };
 
-const COUNTS = [11, 14, 16, 18];
+/** the fabrics offered as quick chips; "ผ้าอื่น…" opens the full picker */
+const QUICK_FABRICS: FabricValue[] = [
+  { fabric: 'aida', count: 11, over: 1 }, { fabric: 'aida', count: 14, over: 1 }, { fabric: 'aida', count: 16, over: 1 },
+  { fabric: 'evenweave', count: 28, over: 2 }, { fabric: 'linen', count: 32, over: 2 },
+];
+const sameFabric = (a: FabricValue, b: FabricValue) => a.fabric === b.fabric && a.count === b.count && a.over === b.over;
+const shortName = (f: FabricValue) => `${fabricDef(f.fabric).name()} ${f.count}${f.over === 2 ? ' /2' : ''}`;
 const TPL = { pitch: 3, holeRatio: 0.55, thick: 2 }; // the same defaults as a new template pattern
 const FREE_MIN = 4, FREE_MAX = 200;
 const ones = (s?: string) => (s ? s.split('').reduce((n, c) => n + (c === '1' ? 1 : 0), 0) : 0);
@@ -49,7 +57,11 @@ export function ResizeDialog({ pattern: p, onApply, onClose }: {
     return k.kind === 'tpl' && !k.def.model ? templateDims(k.def, p) : { w: p.cols, h: p.rows };
   });
   const [unit, setUnit] = useState<'cells' | 'cm'>('cells');
-  const [ct, setCt] = useState(p.details.aidaCount || 14);
+  const [fab, setFab] = useState<FabricValue>(() => {
+    const f = fabricOf(p.details);
+    return p.details.baseType === 'aida' ? { fabric: f.def.id, count: f.count, over: f.over } : { fabric: 'aida', count: 14, over: 1 };
+  });
+  const [moreFabrics, setMoreFabrics] = useState(false);
   const [lock, setLock] = useState(true);
   const [mode, setMode] = useState<FitMode>('scale');
   // keep mode: one of the 9 anchors, or (null) a position set by dragging / the arrows
@@ -66,6 +78,8 @@ export function ResizeDialog({ pattern: p, onApply, onClose }: {
   }, [onClose]);
 
   const fabric = kind.kind === 'free' && (p.mode !== 'free' || p.details.baseType === 'aida');
+  const was = fabricOf(p.details);
+  const fabChanged = fabric && (p.details.baseType !== 'aida' || fab.fabric !== was.def.id || fab.count !== was.count || fab.over !== was.over);
   const fixed = kind.kind === 'fixed' || (kind.kind === 'tpl' && !!kind.def.model);
   const min = kind.kind === 'tpl' ? kind.def.min : FREE_MIN;
   const max = kind.kind === 'tpl' ? kind.def.max : FREE_MAX;
@@ -73,13 +87,18 @@ export function ResizeDialog({ pattern: p, onApply, onClose }: {
 
   // the grid, outline and spacing the pattern would end up with
   const target: Target = useMemo(() => {
-    const needle = (pitch: number) => (Math.abs(pitch - p.pitchMm) > 0.01
-      ? { needleSize: suggestNeedle(pitch).size, strands: suggestNeedle(pitch).strand } : {});
+    // a new needle and strand count only when the spacing or the fabric changes; otherwise the person's own stay
+    const needle = (pitch: number, f?: FabricValue) => {
+      if (Math.abs(pitch - p.pitchMm) <= 0.01 && !f) return {};
+      const s = suggestNeedle(pitch, f);
+      return { needleSize: s.size, strands: s.strand };
+    };
     if (kind.kind === 'free') {
-      const pitch = fabric ? +(25.4 / ct).toFixed(3) : p.pitchMm;
+      if (!fabric) return { cols: dims.w, rows: dims.h, mask: freeMask(dims.w, dims.h), pitchMm: p.pitchMm, mode: 'free', details: {} };
+      const f = fabricPatch(fab.fabric, fab.count, fab.over);
       return {
-        cols: dims.w, rows: dims.h, mask: freeMask(dims.w, dims.h), pitchMm: pitch, mode: 'free',
-        details: { ...(fabric ? { baseType: 'aida' as const, aidaCount: ct } : {}), ...needle(pitch) },
+        cols: dims.w, rows: dims.h, mask: freeMask(dims.w, dims.h), pitchMm: f.pitchMm, mode: 'free',
+        details: { ...f.details, ...needle(f.pitchMm, fabChanged ? fab : undefined) },
       };
     }
     if (kind.kind === 'tpl') {
@@ -96,7 +115,7 @@ export function ResizeDialog({ pattern: p, onApply, onClose }: {
       };
     }
     return { cols: p.cols, rows: p.rows, mask: p.mask, pitchMm: p.pitchMm, mode: p.mode, templateId: p.templateId, templateName: p.templateName };
-  }, [kind, dims, ct, fabric, p]);
+  }, [kind, dims, fab, fabric, fabChanged, p]);
 
   const sameGrid = target.cols === p.cols && target.rows === p.rows && target.mask === p.mask && target.templateId === p.templateId;
   const at = useMemo(() => (anchor !== null ? anchorAt(anchor, p, target) : clampPlace(free, p, target)), [anchor, free, p, target]);
@@ -106,7 +125,7 @@ export function ResizeDialog({ pattern: p, onApply, onClose }: {
   const next: Pattern = plan
     ? applyFit(p, target, plan, dropColors)
     : { ...p, pitchMm: target.pitchMm, details: { ...p.details, ...target.details }, updatedAt: Date.now() };
-  const changed = !sameGrid || Math.abs(target.pitchMm - p.pitchMm) > 0.001;
+  const changed = !sameGrid || Math.abs(target.pitchMm - p.pitchMm) > 0.001 || fabChanged;
 
   const cm = (cells: number, pitch = target.pitchMm) => (cells * pitch) / 10;
   const setW = (w: number) => {
@@ -179,12 +198,21 @@ export function ResizeDialog({ pattern: p, onApply, onClose }: {
               <>
                 {fabric && (
                   <>
-                    <h4>{t('เปลี่ยนเบอร์ผ้า · ลายเหมือนเดิมทุกช่อง', 'Change fabric count · same design')}</h4>
+                    <h4>{t('เปลี่ยนผ้า · ลายเหมือนเดิมทุกช่อง', 'Change fabric · same design')}</h4>
                     <div className="rz-fabric">
                       <div className="rz-chips">
-                        {COUNTS.map((c) => <button key={c} className={'chip' + (c === ct ? ' on' : '')} onClick={() => { setCt(c); setDims({ w: p.cols, h: p.rows }); }}>{c} ct</button>)}
+                        {(QUICK_FABRICS.some((q) => sameFabric(q, fab)) ? QUICK_FABRICS : [...QUICK_FABRICS, fab]).map((q) => (
+                          <button key={shortName(q)} className={'chip' + (sameFabric(q, fab) ? ' on' : '')}
+                            onClick={() => { setFab(q); setDims({ w: p.cols, h: p.rows }); }}>{shortName(q)}</button>
+                        ))}
+                        <button className={'chip more' + (moreFabrics ? ' on' : '')} aria-expanded={moreFabrics} onClick={() => setMoreFabrics(!moreFabrics)}>{t('ผ้าอื่น…', 'Other fabric…')}</button>
                       </div>
-                      <p className="hint">{t(`${p.cols} ช่องบนผ้า ${ct} ct ≈ ${cm(p.cols, 25.4 / ct).toFixed(1)} ซม. · เบอร์น้อย ช่องใหญ่ ชิ้นงานใหญ่`, `${p.cols} cells on ${ct} ct ≈ ${cm(p.cols, 25.4 / ct).toFixed(1)} cm · lower count, bigger cells, bigger piece`)}</p>
+                      {moreFabrics && (
+                        <FabricPicker value={fab} cols={target.cols} rows={target.rows} onChange={(v) => { setFab(v); setDims({ w: p.cols, h: p.rows }); }} />
+                      )}
+                      <p className="hint">{t(
+                        `${p.cols} ช่อง บน ${fabricLabel({ fabric: fab.fabric, aidaCount: fab.count, over: fab.over })} ≈ ${cm(p.cols, fabricPatch(fab.fabric, fab.count, fab.over).pitchMm).toFixed(1)} ซม. · ฝีเข็มต่อนิ้วน้อย ช่องใหญ่ ชิ้นงานใหญ่`,
+                        `${p.cols} cells on ${fabricLabel({ fabric: fab.fabric, aidaCount: fab.count, over: fab.over })} ≈ ${cm(p.cols, fabricPatch(fab.fabric, fab.count, fab.over).pitchMm).toFixed(1)} cm · fewer stitches per inch, bigger piece`)}</p>
                     </div>
                     <div className="rz-or">{t('หรือปรับจำนวนช่อง', 'or change the number of cells')}</div>
                   </>
@@ -279,7 +307,9 @@ export function ResizeDialog({ pattern: p, onApply, onClose }: {
                 </div>
               </>
             ) : changed && (
-              <p className="rz-ok">{t('ลายเหมือนเดิมทุกช่อง ไม่ต้องย่อหรือขยาย ขนาดเปลี่ยนตามเบอร์ผ้า', 'Every stitch stays the same; only the finished size changes with the fabric.')}</p>
+              <p className="rz-ok">{Math.abs(target.pitchMm - p.pitchMm) > 0.001
+                ? t('ลายเหมือนเดิมทุกช่อง ไม่ต้องย่อหรือขยาย ขนาดเปลี่ยนตามผ้า', 'Every stitch stays the same; only the finished size changes with the fabric.')
+                : t('ลายเหมือนเดิมทุกช่อง และขนาดงานเท่าเดิม เปลี่ยนแค่ผ้า เข็ม และจำนวนเส้นด้าย', 'Every stitch and the finished size stay the same; only the fabric, needle and strands change.')}</p>
             )}
           </div>
 
@@ -320,7 +350,10 @@ export function ResizeDialog({ pattern: p, onApply, onClose }: {
                   : <div className="warn">{mode === 'clear'
                     ? t(`ความคืบหน้าการปัก ${done.toLocaleString()} ช่อง (${pct(done)}%) จะถูกล้าง`, `Your stitching progress (${done.toLocaleString()} cells, ${pct(done)}%) will be cleared`)
                     : t(`ย่อลายแล้วหลายช่องรวมเป็นช่องเดียว นับช่องที่ปักแล้วต่อไม่ได้ ความคืบหน้า ${done.toLocaleString()} ช่อง (${pct(done)}%) จะถูกล้าง`, `Shrinking merges cells, so stitched cells can't carry over: your progress (${done.toLocaleString()} cells, ${pct(done)}%) will be cleared`)}</div>)}
-              {Math.abs(target.pitchMm - p.pitchMm) > 0.01 && <div>{t('ระยะรู', 'Hole pitch')} {target.pitchMm.toFixed(2)} {t('มม.', 'mm')} · {t('เข็ม', 'needle')} {suggestNeedle(target.pitchMm).size} · {suggestNeedle(target.pitchMm).strand} {t('เส้น', 'strands')}</div>}
+              {fabChanged && <div>{t('ผ้า', 'Fabric')} <b>{fabricLabel({ fabric: fab.fabric, aidaCount: fab.count, over: fab.over })}</b></div>}
+              {(Math.abs(target.pitchMm - p.pitchMm) > 0.01 || fabChanged) && (
+                <div>{t('ระยะรู', 'Hole pitch')} {target.pitchMm.toFixed(2)} {t('มม.', 'mm')} · {t('เข็ม', 'needle')} {next.details.needleSize} · {next.details.strands} {t('เส้น', 'strands')}</div>
+              )}
               {dropped > 0 && (
                 <label className="check rz-drop"><input type="checkbox" checked={dropColors} onChange={(e) => setDropColors(e.target.checked)} />
                   <span>{t(`ลบสีที่ไม่ได้ใช้แล้ว (${dropped} สี) ออกจากชุดสี`, `Remove the ${dropped} colour${dropped === 1 ? '' : 's'} no longer used`)}</span></label>
@@ -333,7 +366,7 @@ export function ResizeDialog({ pattern: p, onApply, onClose }: {
           <label className="check"><input type="checkbox" checked={keepCopy} onChange={(e) => setKeepCopy(e.target.checked)} /><span>{t('เก็บลายเดิมไว้เป็นสำเนา', 'Keep the original as a copy')}</span></label>
           <button className="btn" onClick={onClose}>{t('ยกเลิก', 'Cancel')}</button>
           <button className="btn primary" disabled={!changed} onClick={() => onApply(next, keepCopy)}>
-            {!plan && changed ? t('ใช้ผ้าเบอร์นี้', 'Use this fabric') : tab === 'model' ? t('ใช้แบบนี้', 'Use this model') : t('ใช้ขนาดนี้', 'Use this size')}
+            {!plan && changed ? t('ใช้ผ้านี้', 'Use this fabric') : tab === 'model' ? t('ใช้แบบนี้', 'Use this model') : t('ใช้ขนาดนี้', 'Use this size')}
           </button>
         </footer>
       </div>

@@ -2,10 +2,12 @@ import { useMemo, useState } from 'react';
 import { Icon } from './Icon';
 import type { Pattern, PatternDetails } from '../types';
 import { BASE_LABEL, DIFFICULTY_LABEL, STITCH_LABEL, defaultDetails } from '../lib/pattern';
-import { computeStats, fmtInch, fmtMm, needleHint } from '../lib/stats';
+import { computeStats, fmtInch, fmtMm } from '../lib/stats';
 import { t } from '../lib/i18n';
 import { DefaultTag, FieldHead } from './DefaultTag';
 import { sameNeedleSize, suggestNeedle } from './needleSuggest';
+import { FabricPicker } from './FabricPicker';
+import { fabricOf, fabricPatch } from '../lib/fabrics';
 
 /** starting values every new pattern gets (see defaultDetails in lib/pattern.ts) */
 const DEF = defaultDetails();
@@ -25,16 +27,24 @@ export function DetailsPanel({ pattern: p, onChange, onResize }: Props) {
   const used = stats.colors.filter((c) => c.count > 0);
   const skeins = used.reduce((a, c) => a + Math.max(0.1, c.skeins), 0);
   const is3d = d.baseType === 'print3d';
-  const sug = suggestNeedle(p.pitchMm);
+  const fab = fabricOf(d);
+  const sug = d.baseType === 'aida' ? suggestNeedle(p.pitchMm, fab) : suggestNeedle(p.pitchMm);
   // plate thickness / hole size of an imported model were measured from the file, not set by us
   const fromModel = p.templateId === 'stl';
   const setBase = (baseType: PatternDetails['baseType']) => {
+    if (baseType === 'aida') {
+      const f = fabricPatch(fab.def.id, fab.count, fab.over);
+      onChange({ details: { ...d, ...f.details }, pitchMm: f.pitchMm });
+      return;
+    }
     const patch: Partial<Pattern> = { details: { ...d, baseType } };
-    if (baseType === 'aida') patch.pitchMm = +(25.4 / d.aidaCount).toFixed(3);
     if (baseType === 'plastic-canvas') patch.pitchMm = +(25.4 / 7).toFixed(3);
     onChange(patch);
   };
-  const setAida = (aidaCount: number) => onChange({ details: { ...d, aidaCount }, pitchMm: +(25.4 / aidaCount).toFixed(3) });
+  const setFabric = (v: { fabric: PatternDetails['fabric']; count: number; over: 1 | 2 }) => {
+    const f = fabricPatch(v.fabric, v.count, v.over);
+    onChange({ details: { ...d, ...f.details }, pitchMm: f.pitchMm });
+  };
 
   return (
     <div className="panel-body details">
@@ -74,11 +84,7 @@ export function DetailsPanel({ pattern: p, onChange, onResize }: Props) {
         </select>
       </label>
       {d.baseType === 'aida' ? (
-        <label><FieldHead label={t('ความถี่ผ้า (count ต่อนิ้ว)', 'Fabric count (per inch)')}><DefaultTag value={d.aidaCount} def={DEF.aidaCount} onReset={() => setAida(DEF.aidaCount)} /></FieldHead>
-          <select value={d.aidaCount} onChange={(e) => setAida(+e.target.value)}>
-            {[11, 14, 16, 18, 20, 22].map((c) => <option key={c} value={c}>{c} ct ({(25.4 / c).toFixed(2)} {t('มม./ช่อง', 'mm/cell')})</option>)}
-          </select>
-        </label>
+        <FabricPicker value={{ fabric: fab.def.id, count: fab.count, over: fab.over }} onChange={setFabric} cols={p.cols} rows={p.rows} />
       ) : (
         <label>{t('ระยะห่างระหว่างรู (มม.)', 'Hole pitch (mm)')}
           <input type="number" step={0.05} min={0.8} max={10} value={p.pitchMm}
@@ -123,7 +129,7 @@ export function DetailsPanel({ pattern: p, onChange, onResize }: Props) {
       </div>
       <datalist id="needles">{[t('เข็มปลายมน (Tapestry)', 'Tapestry (blunt tip)'), t('เข็มปลายแหลม (Embroidery)', 'Embroidery (sharp tip)'), t('เข็มพลาสติก', 'Plastic needle'), t('เข็มร้อยไหมพรม', 'Yarn needle')].map((f) => <option key={f} value={f} />)}</datalist>
       <datalist id="needleSizes">{['#18', '#20', '#22', '#24', '#26', '#28'].map((f) => <option key={f} value={f} />)}</datalist>
-      <p className="hint">{needleHint(p.pitchMm)}</p>
+      <p className="hint">{sug.reason}</p>
 
       <h4>{t('บันทึก / ขั้นตอน', 'Notes / steps')}</h4>
       <textarea rows={4} value={d.notes} onChange={(e) => set({ notes: e.target.value })} aria-label={t('บันทึก / ขั้นตอน', 'Notes / steps')}

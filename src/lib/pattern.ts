@@ -16,6 +16,8 @@ export function defaultDetails(over: Partial<PatternDetails> = {}): PatternDetai
     needleSize: '#24',
     baseType: 'print3d',
     aidaCount: 14,
+    fabric: 'aida',
+    over: 1,
     filament: 'PLA',
     filamentColor: '#f4f1ea',
     thicknessMm: 2,
@@ -91,7 +93,7 @@ export const STITCH_LABEL: Record<PatternDetails['stitchType'], string> = {
 
 export const BASE_LABEL: Record<PatternDetails['baseType'], string> = {
   print3d: t('ชิ้นงานพิมพ์ 3 มิติ', '3D-printed piece'),
-  aida: t('ผ้า Aida', 'Aida fabric'),
+  aida: t('ผ้า (Aida, ลินิน และอื่น ๆ)', 'Fabric (Aida, linen and more)'),
   'plastic-canvas': t('แผ่น Plastic canvas', 'Plastic canvas'),
   other: t('อื่นๆ', 'Other'),
 };

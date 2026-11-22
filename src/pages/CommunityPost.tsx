@@ -22,6 +22,7 @@ import { LikeButton, TeamBadge, usePostPattern } from '../components/PostCard';
 import { PrintView } from './PrintView';
 import { OrderRequestDialog } from '../components/OrderRequestDialog';
 import { ordersEnabled } from '../lib/orders';
+import { fabricLabel } from '../lib/fabrics';
 
 const REPORTED_KEY = 'sbs:reported';
 const reported = (): string[] => { try { return JSON.parse(localStorage.getItem(REPORTED_KEY) || '[]'); } catch { return []; } };
@@ -168,7 +169,7 @@ export function CommunityPost({ id }: { id: string }) {
             </div>
           )}
           <p className="hint">
-            {templateLabel(post.templateName) ?? (post.base === 'aida' ? t('ผ้า Aida', 'Aida fabric') : t('ชิ้นงาน 3D', '3D print'))}
+            {templateLabel(post.templateName) ?? (post.base === 'aida' ? (p?.details.baseType === 'aida' ? fabricLabel(p.details) : t('บนผ้า', 'Fabric')) : t('ชิ้นงาน 3D', '3D print'))}
             {' · '}<span className={`diff-text ${post.difficulty}`}>{DIFFICULTY_LABEL[post.difficulty]}</span>
             {' · '}{post.cols}×{post.rows} {t('ช่อง', 'cells')}
             {stats && <> · {stats.widthMm.toFixed(0)}×{stats.heightMm.toFixed(0)} {t('มม.', 'mm')}</>}
