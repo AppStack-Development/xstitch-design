@@ -9,7 +9,7 @@ import {
 } from './orders';
 
 /** Version of the seller terms (pages/SellerTerms.tsx) a shop accepts when it opens; stored on the shop. */
-export const SELLER_TERMS_VERSION = '2026-11-22';
+export const SELLER_TERMS_VERSION = '2026-11-22b';
 
 /**
  * Shops (docs/marketplace.md). Every order belongs to a shop, which accepts it, checks the slip, makes and ships it.
@@ -273,4 +273,153 @@ export async function shopAction(code: string, action: ShopAction, opts: {
     refunded: !!opts.refunded, new_status: opts.status ?? null,
   });
   if (error) throw new Error(friendlyOrderError(error.message));
+}
+
+// ---------- reviews (0015) ----------
+
+export interface Review { orderId?: number; rating: number; body: string; reply: string | null; repliedAt: string | null; createdAt: string; product?: Product; hidden?: boolean }
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const toReview = (r: any): Review => ({
+  orderId: r.order_id, rating: r.rating, body: r.body ?? '', reply: r.reply ?? null, repliedAt: r.replied_at ?? null,
+  createdAt: r.created_at, product: r.product, hidden: r.hidden,
+});
+
+/** The review of one order (yours, or your shop's), or null. */
+export async function orderReview(orderId: number): Promise<Review | null> {
+  const c = await client();
+  const { data, error } = await c.from('order_reviews').select('order_id, rating, body, reply, replied_at, hidden, created_at').eq('order_id', orderId).maybeSingle();
+  if (error) throw new Error(error.message);
+  return data ? toReview(data) : null;
+}
+
+/** Reviews of a shop's orders, for the shop's own list (visible or hidden). */
+export async function reviewsFor(orderIds: number[]): Promise<Map<number, Review>> {
+  const out = new Map<number, Review>();
+  if (!orderIds.length) return out;
+  const c = await client();
+  const { data, error } = await c.from('order_reviews').select('order_id, rating, body, reply, replied_at, hidden, created_at').in('order_id', orderIds);
+  if (error) throw new Error(error.message);
+  for (const r of data ?? []) out.set(r.order_id, toReview(r));
+  return out;
+}
+
+export async function submitReview(orderId: number, rating: number, body: string): Promise<void> {
+  const c = await client();
+  const { error } = await c.from('order_reviews').insert({ order_id: orderId, rating, body: body.trim().slice(0, 1000) });
+  if (error) throw new Error(/duplicate/.test(error.message) ? t('รีวิวออเดอร์นี้ไปแล้ว', 'You’ve already reviewed this order') : friendlyOrderError(error.message));
+}
+
+export async function replyReview(orderId: number, reply: string): Promise<void> {
+  const c = await client();
+  const { error } = await c.rpc('review_reply', { p_order_id: orderId, p_reply: reply.trim().slice(0, 500) });
+  if (error) throw new Error(error.message);
+}
+
+/** Moderators: hide a review from the public (or show it again). */
+export async function hideReview(orderId: number, hidden: boolean): Promise<void> {
+  const c = await client();
+  const { error } = await c.rpc('review_hide', { p_order_id: orderId, p_hidden: hidden });
+  if (error) throw new Error(error.message);
+}
+
+/** A shop's visible reviews (newest first), without who wrote them. */
+export async function shopReviews(shopId: number): Promise<Review[]> {
+  const c = await client();
+  const { data, error } = await c.rpc('shop_reviews', { sid: shopId });
+  if (error) throw new Error(error.message);
+  return ((data ?? []) as unknown[]).map(toReview);
+}
+
+export interface ShopStats { delivered: number; reviews: number; rating: number | null }
+
+/** Delivered orders, visible reviews and the average rating for some shops. */
+export async function shopStats(ids: number[]): Promise<Map<number, ShopStats>> {
+  const out = new Map<number, ShopStats>();
+  if (!ids.length) return out;
+  const c = await client();
+  const { data, error } = await c.rpc('shop_stats', { ids });
+  if (error) throw new Error(error.message);
+  for (const r of (data ?? []) as { shop_id: number; delivered: number; reviews: number; rating: number | null }[]) {
+    out.set(r.shop_id, { delivered: Number(r.delivered), reviews: Number(r.reviews), rating: r.rating == null ? null : Number(r.rating) });
+  }
+  return out;
+}
+
+// ---------- a shop's public page ----------
+
+export interface ShopForSale { id: string; title: string; data: string; base: 'aida' | 'print3d'; from: number }
+
+/** What the public shop page shows: the shop, its rates, its own community patterns for sale, its reviews. */
+export async function shopProfileData(shopId: number) {
+  const c = await client();
+  const shop = await getShop(shopId);
+  if (!shop) return null;
+  const [rates, stats, reviews, posts] = await Promise.all([
+    getRates(shopId),
+    shopStats([shopId]),
+    shopReviews(shopId),
+    c.from('posts').select('id, title, data, base, post_prices!inner(price_thb)').eq('author', shop.ownerId).eq('status', 'published').limit(60),
+  ]);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const forSale: ShopForSale[] = ((posts.data ?? []) as any[]).map((p) => ({
+    id: p.id, title: p.title, data: p.data, base: p.base, from: Math.min(...(p.post_prices ?? []).map((x: { price_thb: number }) => x.price_thb)),
+  }));
+  return { shop, rates, stats: stats.get(shopId) ?? { delivered: 0, reviews: 0, rating: null }, reviews, forSale };
+}
+
+// ---------- reports ----------
+
+export type ReportReason = 'not_shipped' | 'no_refund' | 'wrong_item' | 'off_site_payment' | 'rude' | 'other';
+export const REPORT_REASONS: { id: ReportReason; label: () => string }[] = [
+  { id: 'not_shipped', label: () => t('ชำระแล้วแต่ไม่ได้ของ', 'Paid but never received') },
+  { id: 'no_refund', label: () => t('ยกเลิกแล้วแต่ไม่คืนเงิน', 'Cancelled but not refunded') },
+  { id: 'wrong_item', label: () => t('ได้ของไม่ตรงกับที่สั่ง', 'Got something different from the order') },
+  { id: 'off_site_payment', label: () => t('ขอให้โอนนอกระบบหรือเก็บเงินเพิ่ม', 'Asked to pay another way or more') },
+  { id: 'rude', label: () => t('พูดจาไม่สุภาพหรือคุกคาม', 'Rude or harassing') },
+  { id: 'other', label: () => t('อื่น ๆ', 'Something else') },
+];
+export const reportReasonLabel = (id: string) => REPORT_REASONS.find((r) => r.id === id)?.label() ?? id;
+
+export async function reportShop(shopId: number, reason: ReportReason, note: string, orderId?: number | null): Promise<void> {
+  const c = await client();
+  const { error } = await c.from('shop_reports').insert({ shop_id: shopId, order_id: orderId ?? null, reason, note: note.trim().slice(0, 1000) });
+  if (error) throw new Error(/too many reports/.test(error.message) ? t('แจ้งปัญหาหลายครั้งแล้ววันนี้ ลองใหม่พรุ่งนี้', 'You’ve sent several reports today. Try again tomorrow.') : friendlyOrderError(error.message));
+}
+
+export interface ShopReport {
+  id: number; shopId: number; shopName: string; orderId: number | null; orderCode: string | null;
+  reason: ReportReason; note: string; createdAt: string; resolvedAt: string | null; resolution: string | null;
+}
+
+/** Moderators: reports, open ones first. */
+export async function listShopReports(open: boolean): Promise<ShopReport[]> {
+  const c = await client();
+  let q = c.from('shop_reports').select('id, shop_id, order_id, reason, note, created_at, resolved_at, resolution, shops(name), orders(code)');
+  q = open ? q.is('resolved_at', null) : q.not('resolved_at', 'is', null);
+  const { data, error } = await q.order('created_at', { ascending: open }).limit(200);
+  if (error) throw new Error(error.message);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return ((data ?? []) as any[]).map((r) => ({
+    id: r.id, shopId: r.shop_id, shopName: r.shops?.name ?? '?', orderId: r.order_id, orderCode: r.orders?.code ?? null,
+    reason: r.reason, note: r.note, createdAt: r.created_at, resolvedAt: r.resolved_at, resolution: r.resolution,
+  }));
+}
+
+/** Moderators: close a report; 'suspended' also suspends the shop. */
+export async function resolveShopReport(r: ShopReport, resolution: 'dismissed' | 'warned' | 'suspended'): Promise<void> {
+  const c = await client();
+  if (resolution === 'suspended') {
+    const { error } = await c.from('shops').update({ suspended: true }).eq('id', r.shopId);
+    if (error) throw new Error(error.message);
+  }
+  const { error } = await c.from('shop_reports').update({ resolution, resolved_at: new Date().toISOString() }).eq('id', r.id);
+  if (error) throw new Error(error.message);
+}
+
+/** Moderators: restore a suspended shop. */
+export async function setShopSuspended(shopId: number, suspended: boolean): Promise<void> {
+  const c = await client();
+  const { error } = await c.from('shops').update({ suspended }).eq('id', shopId);
+  if (error) throw new Error(error.message);
 }

@@ -18,7 +18,7 @@ import { useStash } from '../lib/stash';
 import { DMC_LIBRARY } from '../lib/threads';
 import { STATUS_LABEL as ORDER_STATUS, baht, isClosed, myOrders, ordersEnabled, type Order } from '../lib/orders';
 import { APP_SLUG } from '../lib/brand';
-import { shopsIWork, type Shop } from '../lib/shops';
+import { listShopReports, shopsIWork, type Shop } from '../lib/shops';
 
 const errText = (e: unknown) => (e as Error)?.message || t('เกิดข้อผิดพลาด ลองอีกครั้ง', 'Something went wrong. Please try again.');
 
@@ -299,6 +299,7 @@ function OrdersCard() {
 /** Team accounts only: how many reports wait for review, and the way to the review page. */
 function ModeratorCard() {
   const [count, setCount] = useState<number | null>(null);
+  const [shopCount, setShopCount] = useState(0);
   const [mod, setMod] = useState(false);
   useEffect(() => {
     let live = true;
@@ -307,6 +308,7 @@ function ModeratorCard() {
       setMod(true);
       const n = await openPostCount().catch(() => null);
       if (live) setCount(n);
+      if (ordersEnabled) listShopReports(true).then((x) => { if (live) setShopCount(x.length); }).catch(() => { /* no count */ });
     });
     return () => { live = false; };
   }, []);
@@ -321,6 +323,7 @@ function ModeratorCard() {
       </p>
       <div className="btn-row">
         <a className={'btn' + (count ? ' primary' : '')} href="#/moderation"><Icon name="flag" size={16} /> {t('ตรวจการแจ้งปัญหา', 'Review reports')}{count ? ` (${count})` : ''}</a>
+        {ordersEnabled && <a className={'btn' + (shopCount ? ' primary' : '')} href="#/moderation/shops"><Icon name="flag" size={16} /> {t('แจ้งปัญหาร้าน', 'Shop reports')}{shopCount ? ` (${shopCount})` : ''}</a>}
         <a className="btn" href="#/shop"><Icon name="cube" size={16} /> {t('ออเดอร์ร้านทีม', 'Team shop orders')}</a>
         <a className="btn" href="#/shop/settings">{t('ราคาและตั้งค่าร้านทีม', 'Team shop prices and settings')}</a>
       </div>

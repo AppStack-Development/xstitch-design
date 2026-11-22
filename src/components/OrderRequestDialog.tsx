@@ -4,7 +4,8 @@ import {
   PLASTIC_COLORS, PRODUCTS, addressProblem, baht, cannotOrder, cm, emptyAddress, lastAddress, pieceMm, placeOrder,
   sizeLabel, sizeOf, type Address, type Material, type Product,
 } from '../lib/orders';
-import { postInfo, postQuotes, shopQuotes, type ShopOffer } from '../lib/shops';
+import { postInfo, postQuotes, shopQuotes, shopStats, type ShopOffer, type ShopStats } from '../lib/shops';
+import { ShopScore } from './ShopTrust';
 import { signInWithGoogle, useCloud } from '../lib/cloud';
 import { detectInApp } from '../lib/inAppBrowser';
 import { computeStats } from '../lib/stats';
@@ -82,6 +83,7 @@ const offering = (offers: ShopOffer[] | null, p: Product) => (offers ?? []).filt
 
 function OrderForm({ pattern, onClose, postId }: { pattern: Pattern; onClose: () => void; postId: string | null }) {
   const [offers, setOffers] = useState<ShopOffer[] | null>(null);
+  const [scores, setScores] = useState<Map<number, ShopStats>>(new Map());
   const [material, setMaterial] = useState<Material | null>(null);
   const [product, setProduct] = useState<Product | null>(null);
   const [shopId, setShopId] = useState<number | null>(null);
@@ -125,6 +127,7 @@ function OrderForm({ pattern, onClose, postId }: { pattern: Pattern; onClose: ()
         }
         setMaterial(m);
         setOffers(mine);
+        shopStats(mine.map((o) => o.shopId)).then((x) => { if (live) setScores(x); }).catch(() => { /* no stars */ });
         // start on the first product some shop makes, at its cheapest shop
         const first = PRODUCTS.find((p) => p.material === m && offering(mine, p.id).length > 0);
         if (first) {
@@ -232,11 +235,12 @@ function OrderForm({ pattern, onClose, postId }: { pattern: Pattern; onClose: ()
                   <span>
                     <b className="order-shop-head"><span>{o.shopName}{o.official && <span className="order-team">{t('ทีม', 'Team')}</span>}{!o.official && source && o.shopId === source.authorShopId && <span className="order-team">{t('เจ้าของลาย', 'The designer')}</span>}</span><em className="order-each">{baht(o.prices[product]!)}</em></b>
                     <small>
-                      {o.delivered > 0 ? t(`ส่งสำเร็จ ${o.delivered} ออเดอร์`, `${o.delivered} delivered`) : o.official ? t('ร้านของทีมผู้สร้างเว็บ', 'The site team’s shop') : t('ร้านใหม่', 'New shop')}
+                      <ShopScore {...(scores.get(o.shopId) ?? { delivered: o.delivered, reviews: 0, rating: null })} official={o.official} />
                       {o.leadTime && <> · {t(`ผลิต ${o.leadTime}`, `ready in ${o.leadTime}`)}</>}
                       {' · '}{t(`ค่าส่ง ${baht(o.shippingThb)}`, `shipping ${baht(o.shippingThb)}`)}
                     </small>
                     {o.kitNote && (product === 'kit' || product === 'fabric_kit') && <small className="order-kit-note">{t('ในชุดมี', 'The kit has')}: {o.kitNote}</small>}
+                    <small><a className="acct-link" href={`#/shops/${o.shopId}`} target="_blank" rel="noopener" onClick={(e) => e.stopPropagation()}>{t('ดูหน้าร้านและรีวิว', 'See the shop and its reviews')}</a></small>
                   </span>
                 </label>
               ))}

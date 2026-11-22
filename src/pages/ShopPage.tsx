@@ -60,6 +60,7 @@ export function ShopPage({ view }: { view: 'orders' | 'settings' }) {
           <a className={view === 'orders' ? 'on' : ''} href="#/shop">{t('ออเดอร์', 'Orders')}</a>
           <a className={view === 'settings' ? 'on' : ''} href="#/shop/settings">{t('ตั้งค่าร้าน', 'Shop settings')}</a>
         </nav>
+        <p className="hint shop-public-link"><a className="acct-link" href={`#/shops/${shop.id}`}>{t('ดูหน้าร้านที่ลูกค้าเห็น (ราคา ลายที่ขาย รีวิว)', 'See your public shop page (prices, patterns for sale, reviews)')}</a></p>
         {shop.suspended && <p className="error">{t('ร้านนี้ถูกระงับโดยทีม ไม่รับออเดอร์ใหม่ แต่ยังทำออเดอร์ที่ค้างอยู่ให้เสร็จได้', 'This shop is suspended by the team: no new orders, but you can finish the ones you have.')}</p>}
         {!shop.accepting && !shop.suspended && <p className="hint shop-closed">{t('ร้านปิดรับออเดอร์ชั่วคราวอยู่', 'The shop is closed for new orders for now.')} <a className="acct-link" href="#/shop/settings">{t('เปิดรับอีกครั้ง', 'Open again')}</a></p>}
         {view === 'orders'

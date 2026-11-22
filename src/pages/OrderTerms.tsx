@@ -55,10 +55,10 @@ export function OrderTerms() {
 
           <Sec title={t('การตอบรับและการชำระเงิน', 'Acceptance and payment')}>
             <ul>
-              <li>{t('ร้านจะตอบรับหรือปฏิเสธออเดอร์ภายใน 3 วัน (ร้านทีมตอบรับให้ทันที) อย่าเพิ่งโอนเงินจนกว่าร้านจะตอบรับ', 'The shop accepts or declines within 3 days (the team’s shop accepts straight away). Don’t pay until the shop has accepted.')}</li>
+              <li>{t('ร้านจะตอบรับหรือปฏิเสธออเดอร์ภายใน 3 วัน (ร้านทีมตอบรับให้ทันที) ถ้าร้านไม่ตอบภายใน 3 วัน ออเดอร์จะถูกยกเลิกอัตโนมัติ อย่าเพิ่งโอนเงินจนกว่าร้านจะตอบรับ', 'The shop accepts or declines within 3 days (the team’s shop accepts straight away); if it doesn’t answer in 3 days, the order is cancelled automatically. Don’t pay until the shop has accepted.')}</li>
               <li>{t('เมื่อร้านตอบรับแล้ว ชำระผ่านพร้อมเพย์ของร้านตามยอดในหน้าออเดอร์ เงินเข้าบัญชีร้านโดยตรง แล้วแนบสลิปในหน้าเดียวกัน', 'Once accepted, pay the shop’s PromptPay for the amount on your order page; the money goes straight to the shop. Then attach the slip on the same page.')}</li>
               <li>{t('ชำระเฉพาะตามยอดและพร้อมเพย์ที่แสดงในหน้าออเดอร์เท่านั้น ถ้าร้านขอให้โอนช่องทางอื่นหรือยอดอื่น แจ้งปัญหากับเราได้', 'Pay only the amount and PromptPay shown on your order page. If a shop asks you to pay another way or another amount, report it to us.')}</li>
-              <li>{t('ร้านเริ่มผลิตหลังยืนยันการชำระเงินแล้วเท่านั้น ออเดอร์ที่ไม่ชำระภายใน 7 วันหลังร้านตอบรับ อาจถูกยกเลิก', 'The shop starts once the payment is confirmed. An order that isn’t paid within 7 days of being accepted may be cancelled.')}</li>
+              <li>{t('ร้านเริ่มผลิตหลังยืนยันการชำระเงินแล้วเท่านั้น ออเดอร์ที่ไม่ชำระภายใน 2 วันหลังร้านตอบรับ (หรือหลังร้านแจ้งว่าสลิปไม่ถูกต้อง) จะถูกยกเลิกอัตโนมัติ', 'The shop starts once the payment is confirmed. An order not paid within 2 days of being accepted (or of a slip being turned down) is cancelled automatically.')}</li>
             </ul>
           </Sec>
 
@@ -87,7 +87,8 @@ export function OrderTerms() {
           <Sec title={t('เมื่อมีปัญหากับร้าน', 'Problems with a shop')}>
             <ul>
               <li>{t('คุยกับร้านในข้อความของออเดอร์ก่อน ถ้าตกลงกันไม่ได้ หรือร้านไม่ตอบ ไม่ส่งของ หรือไม่คืนเงิน แจ้งเราได้ทางอีเมลด้านล่าง พร้อมรหัสออเดอร์', 'Talk to the shop in the order’s messages first. If you can’t agree, or the shop doesn’t answer, send, or refund, email us below with your order code.')}</li>
-              <li>{t('เราจะดูประวัติออเดอร์และข้อความ แล้วอาจระงับร้านที่ทำผิดข้อกำหนด แต่เราไม่ได้ถือเงินของออเดอร์ จึงไม่สามารถคืนเงินแทนร้านได้ ยกเว้นออเดอร์ของร้านทีม', 'We’ll look at the order’s history and messages and may suspend a shop that broke the terms, but we don’t hold the money, so we can’t refund on a shop’s behalf, except for orders from the team’s shop.')}</li>
+              <li>{t('หรือกด “แจ้งทีม” ในหน้าออเดอร์ ทีมจะเห็นออเดอร์ ข้อความ และสลิปของออเดอร์นั้น (ไม่เห็นที่อยู่) แล้วอาจระงับร้านที่ทำผิดข้อกำหนด แต่เราไม่ได้ถือเงินของออเดอร์ จึงไม่สามารถคืนเงินแทนร้านได้ ยกเว้นออเดอร์ของร้านทีม', 'Or tap “Tell the team” on the order page: the team then sees that order, its messages and slip (not your address) and may suspend a shop that broke the terms. We don’t hold the money, so we can’t refund on a shop’s behalf, except for orders from the team’s shop.')}</li>
+              <li>{t('หลังได้รับของ รีวิวร้านได้หนึ่งครั้งต่อออเดอร์ รีวิวแสดงในหน้าร้านโดยไม่บอกชื่อคุณ ร้านตอบได้หนึ่งครั้ง ทีมอาจซ่อนรีวิวที่ไม่เหมาะสม', 'After receiving your order you can review the shop once per order. Reviews appear on the shop’s page without your name; the shop may reply once, and the team may hide inappropriate reviews.')}</li>
             </ul>
           </Sec>
 

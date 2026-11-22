@@ -10,10 +10,12 @@ const when = (iso: string) => new Date(iso).toLocaleString(locale, { day: 'numer
  * Messages between the customer and the team on one order. `asTeam` flips whose messages sit on the right.
  * Reloads when the tab comes back into view, so a reply shows up without a refresh.
  */
-export function OrderThread({ orderId, asTeam, shopName, onMessages }: {
+export function OrderThread({ orderId, asTeam, shopName, readOnly, onMessages }: {
   orderId: number; asTeam: boolean;
   /** the shop the order went to; its messages carry this name (the team's shop by default) */
   shopName?: string;
+  /** the team reading a reported order: no reply box */
+  readOnly?: boolean;
   /** called with the messages every time they (re)load, e.g. so the team card can show a count */
   onMessages?: (items: OrderMessage[]) => void;
 }) {
@@ -75,7 +77,7 @@ export function OrderThread({ orderId, asTeam, shopName, onMessages }: {
         </ol>
       )}
       <div ref={endRef} />
-      <div className="order-reply">
+      {!readOnly && <div className="order-reply">
         <textarea value={text} rows={2} maxLength={1000} onChange={(e) => setText(e.target.value)}
           aria-label={asTeam ? t('ตอบลูกค้า', 'Reply to the customer') : t(`ข้อความถึง${shop}`, `Message to ${shop}`)}
           placeholder={asTeam ? t('ตอบลูกค้า…', 'Reply to the customer…') : t(`พิมพ์ถึง${shop}…`, `Write to ${shop}…`)}
@@ -83,7 +85,7 @@ export function OrderThread({ orderId, asTeam, shopName, onMessages }: {
         <button className="btn primary" onClick={send} disabled={busy || !text.trim()}>
           <Icon name="send" size={16} /> {busy ? t('กำลังส่ง…', 'Sending…') : t('ส่ง', 'Send')}
         </button>
-      </div>
+      </div>}
       {err && <p className="error small">{err}</p>}
     </div>
   );

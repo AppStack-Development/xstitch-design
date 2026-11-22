@@ -7,7 +7,8 @@ import {
   STATUS_LABEL, baht, cancelOrder, productMaterial, sizeLabel, cm, confirmReceived, getOrder, pieceMm, productName,
   promptPayPayload, slipUrl, uploadSlip, type Order, type OrderStatus,
 } from '../lib/orders';
-import { getShop, orderPayment, type Shop, type ShopPayment } from '../lib/shops';
+import { getShop, orderPayment, orderReview, type Review, type Shop, type ShopPayment } from '../lib/shops';
+import { ReportShopDialog, ReviewForm, ReviewItem } from '../components/ShopTrust';
 import { useCloud } from '../lib/cloud';
 import { decodeShare } from '../lib/share';
 import { trackStep } from '../lib/analytics';
@@ -89,6 +90,7 @@ function OrderView({ order: o, onChanged }: { order: Order; onChanged: () => voi
     return () => { live = false; };
   }, [o.data, o.title, o.shopId]);
   const shopName = shop?.name ?? t('ร้าน', 'the shop');
+  const [reporting, setReporting] = useState(false);
   const step = STEP_OF[o.status];
   const { w, h } = pieceMm(o);
 
@@ -97,7 +99,7 @@ function OrderView({ order: o, onChanged }: { order: Order; onChanged: () => voi
       <section className="order-card-box order-status">
         <div className="order-status-head">
           <span className={'status-chip ' + (o.status === 'cancelled' ? 'removed' : o.status === 'done' ? 'published' : 'hidden')}>{STATUS_LABEL[o.status]()}</span>
-          <span className="muted small">{t('สั่งเมื่อ', 'Ordered')} {day(o.createdAt)}{shop && <> · {t(`ร้าน ${shop.name}`, shop.name)}</>}</span>
+          <span className="muted small">{t('สั่งเมื่อ', 'Ordered')} {day(o.createdAt)}{shop && <> · <a className="acct-link" href={`#/shops/${shop.id}`}>{t(`ร้าน ${shop.name}`, shop.name)}</a></>}</span>
         </div>
         {step >= 0 && (
           <ol className="order-steps" aria-label={t('ขั้นตอน', 'Progress')}>
@@ -108,7 +110,10 @@ function OrderView({ order: o, onChanged }: { order: Order; onChanged: () => voi
             ))}
           </ol>
         )}
-        <NextStep order={o} shop={shop} onChanged={onChanged} />
+        {o.mine
+          ? <NextStep order={o} shop={shop} onChanged={onChanged} />
+          : <p className="muted small">{t('คุณเห็นออเดอร์นี้ในฐานะทีม เพราะมีการแจ้งปัญหา ดูได้อย่างเดียว ที่อยู่ของลูกค้าไม่แสดง', 'You see this order as the team because it was reported. Read only; the customer’s address isn’t shown.')}</p>}
+        {o.mine && o.status === 'done' && shop && <OrderReview orderId={o.id} shopName={shop.name} />}
       </section>
 
       <section className="order-card-box">
@@ -145,8 +150,12 @@ function OrderView({ order: o, onChanged }: { order: Order; onChanged: () => voi
 
       <section className="order-card-box">
         <h3><Icon name="chat" size={18} /> {t(`คุยกับร้าน ${shopName}`, `Talk to ${shopName}`)}</h3>
-        <OrderThread orderId={o.id} asTeam={false} shopName={shop?.name} />
+        <OrderThread orderId={o.id} asTeam={false} shopName={shop?.name} readOnly={!o.mine} />
       </section>
+      {o.mine && shop && !shop.official && (
+        <p className="hint order-report"><button className="link-btn" onClick={() => setReporting(true)}><Icon name="flag" size={14} /> {t('มีปัญหากับร้านนี้? แจ้งทีม', 'A problem with this shop? Tell the team')}</button></p>
+      )}
+      {reporting && shop && <ReportShopDialog shopId={shop.id} shopName={shop.name} orderId={o.id} onClose={() => setReporting(false)} />}
     </>
   );
 }
@@ -155,6 +164,20 @@ function OrderView({ order: o, onChanged }: { order: Order; onChanged: () => voi
 export function kindLabel(o: Order, p: Pattern | null): string {
   if (productMaterial(o.product) === 'fabric') return p?.details.baseType === 'aida' ? fabricLabel(p.details) : t('ลายบนผ้า', 'On fabric');
   return templateLabel(o.templateName) ?? t('ชิ้นงาน 3D', '3D piece');
+}
+
+/** The customer's review of a received order: the form, or what they wrote (and the shop's reply). */
+function OrderReview({ orderId, shopName }: { orderId: number; shopName: string }) {
+  const [review, setReview] = useState<Review | null | undefined>(undefined);
+  const [reload, setReload] = useState(0);
+  useEffect(() => {
+    let live = true;
+    orderReview(orderId).then((r) => { if (live) setReview(r); }).catch(() => { if (live) setReview(null); });
+    return () => { live = false; };
+  }, [orderId, reload]);
+  if (review === undefined) return null;
+  return review ? <div className="order-my-review"><p className="small"><b>{t('รีวิวของคุณ', 'Your review')}</b></p><ReviewItem review={review} shopName={shopName} /></div>
+    : <ReviewForm orderId={orderId} shopName={shopName} onDone={() => setReload((n) => n + 1)} />;
 }
 
 /** What the customer does (or waits for) now. */

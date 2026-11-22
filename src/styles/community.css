@@ -301,3 +301,51 @@
 .sell-post[open] > summary { margin-bottom: 10px; }
 .sell-post .order-price-table th small { display: block; font-weight: 400; color: var(--ink-3); font-size: 12px; line-height: 1.4; }
 .sell-post .order-price-table td { width: 110px; }
+
+/* ---------- reviews, shop scores and reports (components/ShopTrust.tsx, phase 4) ---------- */
+.stars { display: inline-flex; gap: 1px; line-height: 1; color: #d9d2c4; letter-spacing: 0; vertical-align: -1px; }
+.stars .on { color: #d99a1e; }
+.shop-score { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 2px 5px; font-size: 13px; color: var(--ink-2); }
+.shop-score b { color: var(--ink); }
+.star-pick { display: flex; gap: 4px; }
+.star-pick button { width: 40px; height: 40px; border: 1px solid var(--line-2); border-radius: 10px; background: var(--paper); color: #d9d2c4; font-size: 22px; line-height: 1; cursor: pointer; display: grid; place-items: center; padding: 0; }
+.star-pick button.on { color: #d99a1e; border-color: #e7c27a; background: #fdf6e7; }
+.star-pick button:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+.review-form, .order-review-box, .order-my-review { display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; border-radius: 10px; background: var(--bg); }
+.review-form p, .order-review-box p, .order-my-review p { margin: 0; }
+.review-form textarea, .review-reply-box textarea { width: 100%; border: 1px solid var(--line-2); border-radius: 10px; padding: 8px 10px; font: inherit; background: var(--paper); color: var(--ink); resize: vertical; }
+.review-form .btn-row { display: flex; justify-content: flex-end; }
+.review-item { display: flex; flex-direction: column; gap: 6px; padding: 10px 0; border-top: 1px solid var(--line); }
+.review-item:first-of-type { border-top: 0; padding-top: 0; }
+.order-review-box .review-item, .order-my-review .review-item { border-top: 0; padding: 0; }
+.review-item-head { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; }
+.review-item p { margin: 0; overflow-wrap: anywhere; }
+.review-reply { padding: 8px 12px; border-left: 3px solid var(--line-2); background: var(--bg); border-radius: 0 8px 8px 0; font-size: 14px; }
+.order-review-box .review-reply, .order-my-review .review-reply { background: var(--paper); }
+.review-reply-box { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
+.mod-review { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding-bottom: 10px; border-bottom: 1px solid var(--line); }
+.mod-review:last-child { border-bottom: 0; padding-bottom: 0; }
+.mod-review .review-item { border-top: 0; padding: 0; align-self: stretch; }
+.order-report, .shop-public-link { margin: 0; }
+
+/* a shop's public page (pages/ShopProfile.tsx) */
+.shop-hero-head { display: flex; align-items: flex-start; gap: 14px; }
+.shop-hero-head > div { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.shop-hero h1 { margin: 0; font-size: 22px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; overflow-wrap: anywhere; }
+.shop-hero h1 .order-team { display: inline-block; }
+.shop-avatar { flex-shrink: 0; width: 52px; height: 52px; border-radius: 50%; display: grid; place-items: center; background: var(--brand); color: #fff; font-size: 22px; font-weight: 700; }
+.shop-for-sale { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.shop-sale-card { display: flex; flex-direction: column; gap: 2px; padding: 8px; border: 1px solid var(--line); border-radius: 12px; color: var(--ink); text-decoration: none; background: var(--paper); min-width: 0; }
+.shop-sale-card:hover { border-color: var(--brand); }
+.shop-sale-card b { font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.shop-sale-thumb { height: 104px; display: grid; place-items: center; border-radius: 8px; margin-bottom: 4px; overflow: hidden; background: repeating-conic-gradient(#f2ede4 0 25%, #f8f5ef 0 50%) 0 0 / 16px 16px; }
+.shop-sale-thumb canvas { max-width: 90%; max-height: 92px; width: auto !important; height: auto !important; }
+.shop-profile .rate-card { overflow-x: auto; }
+@media (max-width: 600px) {
+  .shop-for-sale { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .shop-hero h1 { font-size: 19px; }
+}
+
+/* "made to order · from ฿X" on community cards (components/PostCard.tsx) */
+.sale-badge { position: absolute; left: 8px; bottom: 8px; max-width: calc(100% - 16px); font-size: 11.5px; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: #2f7d4fe6; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+

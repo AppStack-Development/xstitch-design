@@ -91,6 +91,7 @@ export function PostCard({ post, liked, onLike }: { post: Post; liked: boolean; 
       <a className="sample-thumb" href={href} aria-label={post.title}>
         {p ? <Thumb pattern={p} max={150} view="stitch" /> : <span className="post-wait" aria-hidden="true" />}
         <span className={`sample-kind ${post.base}`}>{post.base === 'aida' ? t('บนผ้า', 'Fabric') : '3D'}</span>
+        {post.forSaleFrom !== null && <span className="sale-badge">{t(`สั่งผลิตได้ · จาก ${post.forSaleFrom.toLocaleString()} บาท`, `Made to order · from ฿${post.forSaleFrom.toLocaleString()}`)}</span>}
       </a>
       <div className="sample-body">
         <h3><a href={href}>{post.title}</a></h3>

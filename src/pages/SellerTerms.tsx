@@ -47,7 +47,8 @@ export function SellerTerms() {
           <Sec title={t('ราคาและการรับออเดอร์', 'Prices and taking orders')}>
             <ul>
               <li>{t('ราคาที่ร้านตั้งในเว็บ รวมค่าส่ง คือยอดที่ลูกค้าจ่าย ห้ามเรียกเก็บเพิ่มนอกยอดในออเดอร์ หรือขอให้โอนช่องทางอื่น', 'The prices you set on the site, shipping included, are what the customer pays. Don’t charge anything beyond the order’s total or ask for payment another way.')}</li>
-              <li>{t('ตอบรับหรือปฏิเสธออเดอร์ภายใน 3 วัน ถ้าปฏิเสธ ให้บอกเหตุผล ปิดรับชั่วคราวได้ในตั้งค่าร้านเมื่อคิวเต็มหรือไม่อยู่', 'Accept or decline each order within 3 days, giving a reason if you decline. Close your shop for a while in the settings when you’re full or away.')}</li>
+              <li>{t('ตอบรับหรือปฏิเสธออเดอร์ภายใน 3 วัน ถ้าปฏิเสธ ให้บอกเหตุผล ออเดอร์ที่ไม่ตอบภายใน 3 วันจะถูกยกเลิกอัตโนมัติ ปิดรับชั่วคราวได้ในตั้งค่าร้านเมื่อคิวเต็มหรือไม่อยู่', 'Accept or decline each order within 3 days, giving a reason if you decline; unanswered orders are cancelled automatically after 3 days. Close your shop for a while in the settings when you’re full or away.')}</li>
+              <li>{t('ลูกค้ามีเวลาโอน 2 วันหลังร้านรับออเดอร์ (หรือหลังร้านแจ้งว่าสลิปไม่ถูกต้อง) ถ้าไม่โอน ออเดอร์จะถูกยกเลิกอัตโนมัติ', 'Customers have 2 days to pay after you accept (or after you turn a slip down); unpaid orders are then cancelled automatically.')}</li>
               <li>{t('ร้านใหม่มีออเดอร์ที่ยังไม่ปิดได้ครั้งละ 3 ออเดอร์ จนส่งสำเร็จครบ 3 ออเดอร์แรก', 'A new shop holds up to 3 open orders at a time until it has delivered 3.')}</li>
             </ul>
           </Sec>
@@ -79,6 +80,13 @@ export function SellerTerms() {
             <ul>
               <li>{t('ใช้ลายของลูกค้าได้เฉพาะเพื่อผลิตออเดอร์นั้น ห้ามขาย แจก หรือเผยแพร่ต่อโดยไม่ได้รับอนุญาตจากเจ้าของลาย', 'Use a customer’s design only to make their order. Never sell, give away or publish it without its owner’s permission.')}</li>
               <li>{t('ร้านปฏิเสธลายที่ใช้ตัวการ์ตูน โลโก้ หรือแบรนด์ของคนอื่นโดยไม่ได้รับอนุญาต หรือมีเนื้อหาไม่เหมาะสมได้', 'You may decline designs that use other people’s characters, logos or brands without permission, or that have inappropriate content.')}</li>
+            </ul>
+          </Sec>
+
+          <Sec title={t('รีวิวและการแจ้งปัญหา', 'Reviews and reports')}>
+            <ul>
+              <li>{t('ลูกค้ารีวิวร้านได้หลังได้รับของ รีวิวและคะแนนเฉลี่ยแสดงในหน้าร้าน ร้านตอบรีวิวได้หนึ่งครั้ง', 'Customers can review your shop after receiving an order. Reviews and your average rating appear on your shop page; you may reply to each once.')}</li>
+              <li>{t('ลูกค้าแจ้งปัญหาร้านถึงทีมได้ เมื่อแจ้งเรื่องออเดอร์ ทีมจะเห็นออเดอร์ ข้อความ และสลิปของออเดอร์นั้นเพื่อดูเรื่อง', 'Customers can report your shop to the team; for a reported order, the team sees that order, its messages and slip to look into it.')}</li>
             </ul>
           </Sec>
 

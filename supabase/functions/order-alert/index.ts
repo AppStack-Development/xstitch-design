@@ -83,13 +83,13 @@ function dueMails(o: Order, shop: Shop | null, msg: Message | null): Mail[] {
     [what, waitingForShop ? `ยอด ${baht(o.total_thb, 'th')} · รอร้านกดรับหรือปฏิเสธในหน้าร้าน` : `ยอด ${baht(o.total_thb, 'th')} · รอลูกค้าชำระและแนบสลิป`]);
   customer('new', o.created_at, tr(`ได้รับออเดอร์ ${o.code} แล้ว`, `We've got your order ${o.code}`), waitingForShop ? [
     tr(`ส่งคำสั่งซื้อ “${o.title}” ให้${byShop} แล้ว`, `Your order for “${o.title}” has gone to ${byShop}.`),
-    tr('รอร้านตอบรับ ปกติภายใน 3 วัน ร้านรับแล้วจะมีอีเมลแจ้ง และเห็นช่องทางชำระเงินในหน้าออเดอร์ ยังไม่ต้องโอนเงินตอนนี้',
-      'Wait for the shop to accept, usually within 3 days. You’ll get an email and the payment details on your order page then. Don’t pay yet.'),
+    tr('รอร้านตอบรับภายใน 3 วัน (ถ้าไม่ตอบ ออเดอร์จะถูกยกเลิกอัตโนมัติ) ร้านรับแล้วจะมีอีเมลแจ้ง และเห็นช่องทางชำระเงินในหน้าออเดอร์ ยังไม่ต้องโอนเงินตอนนี้',
+      'The shop has 3 days to accept (otherwise the order is cancelled automatically). You’ll get an email and the payment details on your order page then. Don’t pay yet.'),
   ] : [
     tr(`ขอบคุณที่สั่ง “${o.title}” กับ${byShop}`, `Thanks for ordering “${o.title}” from ${byShop}.`),
     tr(`ชำระ ${baht(o.total_thb, l)} ผ่านพร้อมเพย์ได้ในหน้าออเดอร์ แล้วแนบสลิปในหน้าเดียวกัน ร้านจะเริ่มผลิตหลังตรวจสลิปแล้ว`,
       `Pay ${baht(o.total_thb, l)} by PromptPay on your order page and attach the slip there. The shop starts making it once the payment is checked.`),
-    tr('ออเดอร์ที่ไม่ชำระภายใน 7 วันอาจถูกยกเลิก', 'Orders not paid within 7 days may be cancelled.'),
+    tr('ออเดอร์ที่ไม่ชำระภายใน 2 วันจะถูกยกเลิกอัตโนมัติ', 'Orders not paid within 2 days are cancelled automatically.'),
   ]);
 
   // accepted by the shop (not for shops that accept by themselves)
@@ -97,7 +97,7 @@ function dueMails(o: Order, shop: Shop | null, msg: Message | null): Mail[] {
     customer('accepted', o.accepted_at, tr(`${byShop} รับออเดอร์ ${o.code} แล้ว`, `${name} accepted your order ${o.code}`), [
       tr(`ชำระ ${baht(o.total_thb, l)} ผ่านพร้อมเพย์ของร้านได้ในหน้าออเดอร์ แล้วแนบสลิปในหน้าเดียวกัน`,
         `Pay ${baht(o.total_thb, l)} to the shop by PromptPay on your order page and attach the slip there.`),
-      tr('เงินโอนเข้าบัญชีของร้านโดยตรง', 'The money goes straight to the shop.'),
+      tr('เงินโอนเข้าบัญชีของร้านโดยตรง ชำระภายใน 2 วัน ไม่อย่างนั้นออเดอร์จะถูกยกเลิกอัตโนมัติ', 'The money goes straight to the shop. Pay within 2 days, or the order is cancelled automatically.'),
     ]);
   }
 
@@ -136,7 +136,7 @@ function dueMails(o: Order, shop: Shop | null, msg: Message | null): Mail[] {
     const why = o.cancel_reason ? [tr(`เหตุผล: ${o.cancel_reason}`, `Reason: ${o.cancel_reason}`)] : [];
     if (o.cancelled_by !== 'shop') {
       toShop('cancelled', o.updated_at, `ออเดอร์ ${o.code} ถูกยกเลิก`, [what,
-        o.cancelled_by === 'customer' ? 'ลูกค้ายกเลิกเอง' : 'ยกเลิกแล้ว',
+        o.cancelled_by === 'customer' ? 'ลูกค้ายกเลิกเอง' : o.cancelled_by === 'system' ? `ยกเลิกอัตโนมัติ: ${o.cancel_reason}` : 'ยกเลิกแล้ว',
         o.paid_at ? 'ออเดอร์นี้ชำระแล้ว ต้องคืนเงินลูกค้า' : 'ยังไม่ได้ชำระเงิน']);
     }
     customer('cancelled', o.updated_at, o.cancelled_by === 'shop' && !o.accepted_at

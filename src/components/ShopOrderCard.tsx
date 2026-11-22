@@ -4,7 +4,8 @@ import {
   ORDER_STATUSES, STATUS_LABEL, baht, cm, getTeamNote, pieceMm, productMaterial, productName, saveTeamNote, sizeOf,
   type Order, type OrderMessage, type OrderStatus,
 } from '../lib/orders';
-import { shopAction, type Shop, type ShopAction } from '../lib/shops';
+import { orderReview, shopAction, type Review, type Shop, type ShopAction } from '../lib/shops';
+import { ReviewItem } from './ShopTrust';
 import { decodeShare, downloadBlob, safeFilename } from '../lib/share';
 import { buildPlate, toBinaryStl } from '../lib/plate';
 import { computeStats } from '../lib/stats';
@@ -47,6 +48,15 @@ export function ShopOrderCard({ order, shop, onChanged }: { order: Order; shop: 
   }, []);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
+  // a received order's review, which the shop can answer once
+  const [review, setReview] = useState<Review | null>(null);
+  const [reviewTick, setReviewTick] = useState(0);
+  useEffect(() => {
+    if (o.status !== 'done') return;
+    let live = true;
+    orderReview(o.id).then((r) => { if (live) setReview(r); }).catch(() => { /* none */ });
+    return () => { live = false; };
+  }, [o.id, o.status, reviewTick]);
   useEffect(() => {
     let live = true;
     decodeShare(o.data).then((x) => { if (live) setP({ ...x, name: o.title }); }).catch(() => { /* no preview */ });
@@ -198,6 +208,8 @@ export function ShopOrderCard({ order, shop, onChanged }: { order: Order; shop: 
             <button className="btn ghost sm" disabled={busy} onClick={() => { setEnding('cancel'); setReason(''); setRefunded(false); }}>{t('ยกเลิกออเดอร์', 'Cancel order')}</button>
           )}
         </div>
+        {review && <div className="order-review-box"><p className="small"><b>{t('รีวิวจากลูกค้า', 'The customer’s review')}</b></p>
+          <ReviewItem review={review} shopName={shop.name} canReply onChanged={() => setReviewTick((n) => n + 1)} /></div>}
         {err && <p className="error small">{err}</p>}
         <details className="order-team-thread" open={threadOpen} onToggle={(e) => setThreadOpen(e.currentTarget.open)}>
           <summary>

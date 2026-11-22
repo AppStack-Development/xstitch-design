@@ -16,8 +16,9 @@ import { lang, t } from './i18n';
 export const ordersEnabled = cloudEnabled;
 
 /** Version of the order terms (pages/OrderTerms.tsx) a new order agrees to; stored on every order.
- *  2026-11-22: orders go to shops, which receive the delivery details (required by shops other than the team's). */
-export const ORDER_TERMS_VERSION = '2026-11-22';
+ *  2026-11-22: orders go to shops, which receive the delivery details (required by shops other than the team's).
+ *  2026-11-22b: automatic cancellation (3 days unanswered, 2 days unpaid), reviews and reporting a shop. */
+export const ORDER_TERMS_VERSION = '2026-11-22b';
 
 /** 3D-printed pieces and pieces on fabric are made, sized and priced differently. */
 export type Material = '3d' | 'fabric';

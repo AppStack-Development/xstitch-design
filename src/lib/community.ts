@@ -48,6 +48,8 @@ export interface Post {
   remixOf: string | null;
   /** the author lets other shops make this design (0014) */
   allowMaking: boolean;
+  /** the lowest price its author's shop sells it for; null = not for sale (0014) */
+  forSaleFrom: number | null;
   status: 'published' | 'hidden' | 'removed';
   likeCount: number;
   createdAt: string;
@@ -55,7 +57,7 @@ export interface Post {
   author: { id: string; name: string; official: boolean };
 }
 
-const COLUMNS = 'id, title, description, base, difficulty, colors, stitches, cols, rows, template_name, tags, data, remix_of, status, like_count, created_at, updated_at, author, allow_making, creators(display_name, official)';
+const COLUMNS = 'id, title, description, base, difficulty, colors, stitches, cols, rows, template_name, tags, data, remix_of, status, like_count, created_at, updated_at, author, allow_making, creators(display_name, official), post_prices(price_thb)';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function toPost(r: any): Post {
@@ -64,6 +66,7 @@ function toPost(r: any): Post {
     colors: r.colors, stitches: r.stitches, cols: r.cols, rows: r.rows, templateName: r.template_name,
     tags: r.tags ?? [], data: r.data, remixOf: r.remix_of, status: r.status, likeCount: r.like_count,
     createdAt: r.created_at, updatedAt: r.updated_at, allowMaking: !!r.allow_making,
+    forSaleFrom: r.post_prices?.length ? Math.min(...r.post_prices.map((x: { price_thb: number }) => x.price_thb)) : null,
     author: { id: r.author, name: r.creators?.display_name ?? t('ไม่ระบุชื่อ', 'Unknown'), official: !!r.creators?.official },
   };
 }
