@@ -211,7 +211,7 @@ function OrderForm({ pattern, onClose, onlyOfficial }: { pattern: Pattern; onClo
                   <span>
                     <b className="order-shop-head"><span>{o.shopName}{o.official && <span className="order-team">{t('ทีม', 'Team')}</span>}</span><em className="order-each">{baht(o.prices[product]!)}</em></b>
                     <small>
-                      {o.delivered > 0 ? t(`ส่งสำเร็จ ${o.delivered} ออเดอร์`, `${o.delivered} delivered`) : t('ร้านใหม่', 'New shop')}
+                      {o.delivered > 0 ? t(`ส่งสำเร็จ ${o.delivered} ออเดอร์`, `${o.delivered} delivered`) : o.official ? t('ร้านของทีมผู้สร้างเว็บ', 'The site team’s shop') : t('ร้านใหม่', 'New shop')}
                       {o.leadTime && <> · {t(`ผลิต ${o.leadTime}`, `ready in ${o.leadTime}`)}</>}
                       {' · '}{t(`ค่าส่ง ${baht(o.shippingThb)}`, `shipping ${baht(o.shippingThb)}`)}
                     </small>
