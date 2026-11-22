@@ -274,3 +274,23 @@
 .shop-settings h4 { margin: 6px 0 0; }
 .shop-handoff { margin-bottom: 14px; }
 .order-end { margin-top: 10px; padding: 10px 12px; border: 1px solid #e9c4c0; border-radius: 10px; background: #fdf6f5; display: flex; flex-direction: column; gap: 8px; }
+
+/* ---------- choosing a shop (components/OrderRequestDialog.tsx) ---------- */
+.order-shops { display: grid; gap: 8px; }
+.order-shop { display: flex; flex-direction: row; align-items: flex-start; gap: 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--paper); cursor: pointer; color: var(--ink); }
+.order-shop.on { border-color: var(--brand); box-shadow: 0 0 0 1px var(--brand) inset; }
+.order-dialog label.order-shop > input[type] { width: 18px; height: 18px; flex-shrink: 0; margin-top: 3px; accent-color: var(--brand); }
+.order-shop > span { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.order-shop-head { display: flex; justify-content: space-between; gap: 8px; font-size: 15px; }
+.order-shop-head > span { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
+.order-shop small { font-size: 13px; color: var(--ink-2); line-height: 1.45; }
+.order-team { font-size: 11px; font-weight: 600; color: var(--brand); padding: 0 7px; line-height: 18px; border-radius: 999px; background: #243b6b0b; border: 1px solid #243b6b2e; }
+.order-kit-note { color: var(--ink-3) !important; }
+.order-none { padding: 12px 14px; border-radius: 12px; background: var(--bg); }
+.order-none p { margin: 0 0 4px; }
+
+/* ---------- the shop's rate card and opening a shop (pages/ShopPage.tsx) ---------- */
+.rate-card { display: flex; flex-direction: column; gap: 6px; }
+.rate-card > b { font-size: 14px; }
+.rate-card .order-price-table input::placeholder { color: var(--ink-3); }
+.shop-open-notes { margin: 0; padding-left: 18px; color: var(--ink-2); line-height: 1.6; }

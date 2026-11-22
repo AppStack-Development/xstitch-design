@@ -1,7 +1,15 @@
 import { client, getCloud } from './cloud';
 import { amModerator } from './moderation';
 import { t } from './i18n';
-import { ORDER_COLS, friendlyOrderError, toOrder, type Order, type OrderStatus } from './orders';
+import { computeStats } from './stats';
+import type { Pattern } from '../types';
+import {
+  ORDER_COLS, friendlyOrderError, materialOf, orderAddresses, toOrder,
+  type Material, type Order, type OrderStatus, type Product, type Size,
+} from './orders';
+
+/** Version of the seller terms (pages/SellerTerms.tsx) a shop accepts when it opens; stored on the shop. */
+export const SELLER_TERMS_VERSION = '2026-11-22';
 
 /**
  * Shops (docs/marketplace.md). Every order belongs to a shop, which accepts it, checks the slip, makes and ships it.
@@ -12,14 +20,19 @@ import { ORDER_COLS, friendlyOrderError, toOrder, type Order, type OrderStatus }
 export interface Shop {
   id: number; ownerId: string; name: string; about: string; accepting: boolean; leadTime: string;
   shippingThb: number; official: boolean; suspended: boolean; createdAt: string;
+  /** baht added per stitch on stitched pieces */
+  stitchRate: number;
+  /** what the shop's kits include */
+  kitNote: string;
 }
 
-const SHOP_COLS = 'id, owner_id, name, about, accepting, lead_time, shipping_thb, official, suspended, created_at';
+const SHOP_COLS = 'id, owner_id, name, about, accepting, lead_time, shipping_thb, official, suspended, created_at, stitch_rate, kit_note';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const toShop = (r: any): Shop => ({
   id: r.id, ownerId: r.owner_id, name: r.name, about: r.about, accepting: r.accepting, leadTime: r.lead_time,
   shippingThb: r.shipping_thb, official: r.official, suspended: r.suspended, createdAt: r.created_at,
+  stitchRate: Number(r.stitch_rate ?? 0), kitNote: r.kit_note ?? '',
 });
 
 export async function getShop(id: number): Promise<Shop | null> {
@@ -49,11 +62,14 @@ export async function shopsIWork(): Promise<Shop[]> {
   return (data ?? []).map(toShop).sort((a, b) => Number(b.ownerId === uid) - Number(a.ownerId === uid));
 }
 
-export interface ShopEdit { name: string; about: string; accepting: boolean; leadTime: string; shippingThb: number }
+export interface ShopEdit {
+  name: string; about: string; accepting: boolean; leadTime: string; shippingThb: number; stitchRate: number; kitNote: string;
+}
 
 export function shopProblem(s: ShopEdit): string | null {
   if (s.name.trim().length < 2) return t('ชื่อร้านอย่างน้อย 2 ตัวอักษร', 'The shop name needs at least 2 characters');
   if (!Number.isInteger(s.shippingThb) || s.shippingThb < 0 || s.shippingThb > 2000) return t('ค่าส่ง 0–2,000 บาท', 'Shipping is 0–2,000 THB');
+  if (!(s.stitchRate >= 0 && s.stitchRate <= 99.99) || Math.abs(Math.round(s.stitchRate * 100) - s.stitchRate * 100) > 1e-6) return t('ค่าปักต่อฝีเข็ม 0–99.99 บาท ทศนิยมไม่เกิน 2 ตำแหน่ง', 'The per-stitch rate is 0–99.99 THB, up to 2 decimals');
   return null;
 }
 
@@ -62,8 +78,81 @@ export async function saveShop(id: number, s: ShopEdit): Promise<void> {
   const { error } = await c.from('shops').update({
     name: s.name.trim().slice(0, 60), about: s.about.trim().slice(0, 500), accepting: s.accepting,
     lead_time: s.leadTime.trim().slice(0, 30), shipping_thb: s.shippingThb,
+    stitch_rate: s.stitchRate, kit_note: s.kitNote.trim().slice(0, 300),
   }).eq('id', id);
   if (error) throw new Error(error.message);
+}
+
+/** Open your own shop (one per account). Prices and PromptPay come next, in the shop settings. */
+export async function openShop(name: string, payment: ShopPayment): Promise<void> {
+  const c = await client();
+  const { data, error } = await c.from('shops')
+    .insert({ name: name.trim().slice(0, 60), seller_terms: SELLER_TERMS_VERSION, lead_time: t('5–7 วัน', '5–7 days') })
+    .select('id').single();
+  if (error) throw new Error(/duplicate/.test(error.message) ? t('บัญชีนี้มีร้านอยู่แล้ว', 'This account already has a shop') : friendlyOrderError(error.message));
+  if (payment.promptpayId.trim()) await saveShopPayment(data.id, payment);
+}
+
+// ---------- rate cards ----------
+
+/** 'kit:M' -> baht; a missing key means the shop doesn't offer it */
+export type Rates = Record<string, number>;
+export const rateKey = (p: Product, s: Size) => `${p}:${s}`;
+
+export async function getRates(shopId: number): Promise<Rates> {
+  const c = await client();
+  const { data, error } = await c.from('shop_rates').select('product, size, price_thb').eq('shop_id', shopId);
+  if (error) throw new Error(error.message);
+  return Object.fromEntries((data ?? []).map((r) => [`${r.product}:${r.size}`, r.price_thb]));
+}
+
+/** Replace the shop's rate card with these prices (anything left out is no longer offered). */
+export async function saveRates(shopId: number, rates: Rates): Promise<void> {
+  const c = await client();
+  const rows = Object.entries(rates).map(([k, price]) => { const [product, size] = k.split(':'); return { shop_id: shopId, product, size, price_thb: price }; });
+  const keep = new Set(Object.keys(rates));
+  const current = await getRates(shopId);
+  const gone = Object.keys(current).filter((k) => !keep.has(k));
+  if (rows.length) {
+    const { error } = await c.from('shop_rates').upsert(rows);
+    if (error) throw new Error(error.message);
+  }
+  for (const k of gone) {
+    const [product, size] = k.split(':');
+    const { error } = await c.from('shop_rates').delete().eq('shop_id', shopId).eq('product', product).eq('size', size);
+    if (error) throw new Error(error.message);
+  }
+}
+
+// ---------- quotes: who can make this piece, for how much ----------
+
+export interface ShopOffer {
+  shopId: number; shopName: string; about: string; leadTime: string; shippingThb: number; official: boolean;
+  kitNote: string; delivered: number; openedAt: string;
+  /** product -> baht per piece, for the products this shop makes at this size */
+  prices: Partial<Record<Product, number>>;
+}
+
+/** Every shop taking orders that makes this pattern at its size, priced by the database. */
+export async function shopQuotes(p: Pattern): Promise<{ material: Material | null; offers: ShopOffer[] }> {
+  const material = materialOf(p);
+  if (!material) return { material, offers: [] };
+  const c = await client();
+  const { data, error } = await c.rpc('shop_quotes', {
+    p_material: material, p_cols: p.cols, p_rows: p.rows, p_pitch: Math.round(p.pitchMm * 100) / 100, p_stitches: computeStats(p).total,
+  });
+  if (error) throw new Error(error.message);
+  const byShop = new Map<number, ShopOffer>();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  for (const r of (data ?? []) as any[]) {
+    const o: ShopOffer = byShop.get(r.shop_id) ?? {
+      shopId: r.shop_id, shopName: r.shop_name, about: r.about ?? '', leadTime: r.lead_time ?? '', shippingThb: r.shipping_thb,
+      official: r.official, kitNote: r.kit_note ?? '', delivered: Number(r.delivered ?? 0), openedAt: r.opened_at, prices: {},
+    };
+    if (r.unit_thb != null) o.prices[r.product as Product] = r.unit_thb;
+    byShop.set(r.shop_id, o);
+  }
+  return { material, offers: [...byShop.values()] };
 }
 
 // ---------- payment details (only the shop's workers read them) ----------
@@ -120,7 +209,10 @@ export async function shopOrders(shopId: number): Promise<Order[]> {
   ]);
   if (open.error) throw new Error(open.error.message);
   if (closed.error) throw new Error(closed.error.message);
-  return [...(open.data ?? []), ...(closed.data ?? [])].map(toOrder);
+  const orders = [...(open.data ?? []), ...(closed.data ?? [])].map(toOrder);
+  // addresses come separately: the shop sees them until 30 days after an order closes
+  const addrs = await orderAddresses(orders.map((o) => o.code)).catch(() => new Map());
+  return orders.map((o) => ({ ...o, address: addrs.get(o.code) ?? o.address }));
 }
 
 export type ShopAction = 'accept' | 'decline' | 'slip_ok' | 'slip_bad' | 'start' | 'ship' | 'cancel' | 'set_status';

@@ -322,7 +322,7 @@ function ModeratorCard() {
       <div className="btn-row">
         <a className={'btn' + (count ? ' primary' : '')} href="#/moderation"><Icon name="flag" size={16} /> {t('ตรวจการแจ้งปัญหา', 'Review reports')}{count ? ` (${count})` : ''}</a>
         <a className="btn" href="#/shop"><Icon name="cube" size={16} /> {t('ออเดอร์ร้านทีม', 'Team shop orders')}</a>
-        <a className="btn" href="#/moderation/orders">{t('ราคาร้านทีม', 'Team shop prices')}</a>
+        <a className="btn" href="#/shop/settings">{t('ราคาและตั้งค่าร้านทีม', 'Team shop prices and settings')}</a>
       </div>
     </section>
   );
@@ -330,14 +330,25 @@ function ModeratorCard() {
 
 /** Your own shop, if you have one (the team shop is reached from the team card). */
 function MyShopCard() {
-  const [shop, setShop] = useState<Shop | null>(null);
+  // undefined while loading (no card yet), null = no shop of your own
+  const [shop, setShop] = useState<Shop | null | undefined>(undefined);
   useEffect(() => {
     let live = true;
     const uid = getCloud().user?.id;
     shopsIWork().then((list) => { if (live) setShop(list.find((x) => x.ownerId === uid) ?? null); }).catch(() => { /* no card */ });
     return () => { live = false; };
   }, []);
-  if (!shop) return null;
+  if (shop === undefined) return null;
+  if (!shop) {
+    return (
+      <section className="acct-card">
+        <h3><Icon name="cube" size={18} /> {t('เปิดร้านรับผลิต', 'Open a shop')}</h3>
+        <p className="muted">{t('รับผลิตลายที่ลูกค้าออกแบบเองเป็นชิ้นงาน 3D หรือลายบนผ้า ตั้งราคาเอง ลูกค้าโอนเข้าพร้อมเพย์ของคุณโดยตรง ไม่มีค่าธรรมเนียม',
+          'Make customers’ own designs as 3D pieces or on fabric, at your own prices. Customers pay your PromptPay directly; no fee.')}</p>
+        <div className="btn-row"><a className="btn" href="#/shop">{t('เปิดร้าน', 'Open a shop')}</a></div>
+      </section>
+    );
+  }
   return (
     <section className="acct-card">
       <h3><Icon name="cube" size={18} /> {t('ร้านของฉัน', 'My shop')}: {shop.name}</h3>

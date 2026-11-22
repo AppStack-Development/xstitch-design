@@ -50,6 +50,9 @@ const PRODUCT: Record<string, [string, string]> = {
   kit: ['ชุดปักเอง', 'Stitch-it-yourself kit'],
   blank: ['ชิ้นงานเปล่า', 'Printed piece only'],
   stitched: ['ปักเสร็จพร้อมใช้', 'Fully stitched'],
+  fabric_kit: ['ชุดปักเอง (ผ้า + ด้าย)', 'Kit (fabric + threads)'],
+  fabric_stitched: ['ปักเสร็จ', 'Stitched'],
+  fabric_framed: ['ปักเสร็จใส่กรอบ', 'Stitched and framed'],
 };
 const baht = (n: number, l: Lang) => (l === 'th' ? `${n.toLocaleString('th-TH')} บาท` : `฿${n.toLocaleString('en-US')}`);
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));

@@ -4,7 +4,7 @@ import { askConfirm } from '../components/ConfirmDialog';
 import qrcode from 'qrcode-generator';
 import type { Pattern } from '../types';
 import {
-  SIZE_LABEL, STATUS_LABEL, baht, cancelOrder, cm, confirmReceived, getOrder, pieceMm, productName,
+  STATUS_LABEL, baht, cancelOrder, productMaterial, sizeLabel, cm, confirmReceived, getOrder, pieceMm, productName,
   promptPayPayload, slipUrl, uploadSlip, type Order, type OrderStatus,
 } from '../lib/orders';
 import { getShop, orderPayment, type Shop, type ShopPayment } from '../lib/shops';
@@ -13,6 +13,7 @@ import { decodeShare } from '../lib/share';
 import { trackStep } from '../lib/analytics';
 import { t, locale } from '../lib/i18n';
 import { templateLabel } from '../lib/templates';
+import { fabricLabel } from '../lib/fabrics';
 import { Thumb } from '../components/Thumb';
 import { Icon } from '../components/Icon';
 import { AccountButton } from '../components/AccountButton';
@@ -120,13 +121,13 @@ function OrderView({ order: o, onChanged }: { order: Order; onChanged: () => voi
             <b>{o.title}</b>
             <p className="muted small">
               {/* each part stays whole, so a narrow screen wraps between parts, never inside one */}
-              {[templateLabel(o.templateName) ?? '3D', `${cm(w)} × ${cm(h)} ${t('ซม.', 'cm')}`, SIZE_LABEL[o.size]()].map((x, i, all) => (
+              {[kindLabel(o, p), `${cm(w)} × ${cm(h)} ${t('ซม.', 'cm')}`, sizeLabel(productMaterial(o.product), o.size)].map((x, i, all) => (
                 <Fragment key={i}><span className="nowrap">{x}{i < all.length - 1 && ' ·'}</span>{i < all.length - 1 && ' '}</Fragment>
               ))}
             </p>
             <ul className="order-facts">
               <li><span>{t('แบบ', 'Product')}</span><b>{productName(o.product)}</b></li>
-              <li><span>{t('สีพลาสติก', 'Plastic')}</span><b>{o.plasticColor || '–'}</b></li>
+              {productMaterial(o.product) === '3d' && <li><span>{t('สีพลาสติก', 'Plastic')}</span><b>{o.plasticColor || '–'}</b></li>}
               <li><span>{t('จำนวน', 'Qty')}</span><b>{o.quantity}</b></li>
             </ul>
           </div>
@@ -148,6 +149,12 @@ function OrderView({ order: o, onChanged }: { order: Order; onChanged: () => voi
       </section>
     </>
   );
+}
+
+/** "Round box", "3D" or "Linen 32 ct · over 2" for an order, from its pattern when it has loaded. */
+export function kindLabel(o: Order, p: Pattern | null): string {
+  if (productMaterial(o.product) === 'fabric') return p?.details.baseType === 'aida' ? fabricLabel(p.details) : t('ลายบนผ้า', 'On fabric');
+  return templateLabel(o.templateName) ?? t('ชิ้นงาน 3D', '3D piece');
 }
 
 /** What the customer does (or waits for) now. */

@@ -16,7 +16,7 @@ import { FeedbackLink } from '../components/FeedbackDialog';
 import { trackStep } from '../lib/analytics';
 import { AccountButton } from '../components/AccountButton';
 import { OrderRequestDialog } from '../components/OrderRequestDialog';
-import { ordersEnabled } from '../lib/orders';
+import { materialOf, ordersEnabled } from '../lib/orders';
 import { navigate } from '../App';
 
 /** What the pattern goes on. Fabric sizes are the longest side in centimetres at 14 count. */
@@ -401,9 +401,9 @@ export function QuickCreate() {
                     <Icon name="cube" size={16} /> {t('ดาวน์โหลด STL ไปพิมพ์', 'Download STL to print')}
                   </button>
                 )}
-                {is3d && ordersEnabled && (
+                {saved && materialOf(saved) && ordersEnabled && (
                   <button className="btn" onClick={() => setOrdering(true)}>
-                    <Icon name="send" size={16} /> {t('ไม่มีเครื่องพิมพ์? ให้เราผลิตให้', 'No printer? Have us make it')}
+                    <Icon name="send" size={16} /> {is3d ? t('ไม่มีเครื่องพิมพ์? ให้ร้านผลิตให้', 'No printer? Have a shop make it') : t('ให้ร้านผลิตเป็นชุดปักหรือปักเสร็จ', 'Have a shop make it as a kit or finished piece')}
                   </button>
                 )}
                 <a className="btn ghost" href={`#/edit/${saved.id}`}><Icon name="edit" size={16} /> {t('ปรับละเอียดในโหมดขั้นสูง', 'Fine-tune in the editor')}</a>

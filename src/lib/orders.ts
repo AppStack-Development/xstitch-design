@@ -15,19 +15,26 @@ import { lang, t } from './i18n';
 
 export const ordersEnabled = cloudEnabled;
 
-/** Version of the order terms (pages/OrderTerms.tsx) a new order agrees to; stored on every order. */
-export const ORDER_TERMS_VERSION = '2026-11-21';
+/** Version of the order terms (pages/OrderTerms.tsx) a new order agrees to; stored on every order.
+ *  2026-11-22: orders go to shops, which receive the delivery details (required by shops other than the team's). */
+export const ORDER_TERMS_VERSION = '2026-11-22';
 
-export type Product = 'blank' | 'kit' | 'stitched';
+/** 3D-printed pieces and pieces on fabric are made, sized and priced differently. */
+export type Material = '3d' | 'fabric';
+export type Product = 'blank' | 'kit' | 'stitched' | 'fabric_kit' | 'fabric_stitched' | 'fabric_framed';
 export type Size = 'S' | 'M' | 'L';
 export type OrderStatus = 'awaiting_accept' | 'awaiting_payment' | 'payment_review' | 'paid' | 'in_production' | 'shipped' | 'done' | 'cancelled';
 
-export const PRODUCTS: { id: Product; name: () => string; desc: () => string }[] = [
-  { id: 'kit', name: () => t('ชุดปักเอง', 'Stitch-it-yourself kit'), desc: () => t('ชิ้นงาน + ด้าย DMC ครบทุกสีตามลาย + เข็ม + การ์ดแผนผัง', 'The piece + every DMC thread in the pattern + needle + chart card') },
-  { id: 'blank', name: () => t('ชิ้นงานเปล่า', 'Printed piece only'), desc: () => t('ชิ้นงานพิมพ์ตามรูปทรงนี้ มีรูสำหรับปักทั้งชิ้น ไม่มีด้าย ดูแผนผังสีได้ในแอป', 'The printed piece in this shape, with stitch holes all over; no threads. Your color chart stays in the app.') },
-  { id: 'stitched', name: () => t('ปักเสร็จพร้อมใช้', 'Fully stitched'), desc: () => t('ทีมปักให้เสร็จ รับจำนวนจำกัดต่อสัปดาห์', 'We stitch it for you; limited each week') },
+export const PRODUCTS: { id: Product; material: Material; name: () => string; desc: () => string; perStitch?: true }[] = [
+  { id: 'kit', material: '3d', name: () => t('ชุดปักเอง', 'Stitch-it-yourself kit'), desc: () => t('ชิ้นงาน + ด้ายครบทุกสีตามลาย + เข็ม + การ์ดแผนผัง', 'The piece + every thread in the pattern + needle + chart card') },
+  { id: 'blank', material: '3d', name: () => t('ชิ้นงานเปล่า', 'Printed piece only'), desc: () => t('ชิ้นงานพิมพ์ตามรูปทรงนี้ มีรูสำหรับปักทั้งชิ้น ไม่มีด้าย ดูแผนผังสีได้ในแอป', 'The printed piece in this shape, with stitch holes all over; no threads. Your color chart stays in the app.') },
+  { id: 'stitched', material: '3d', perStitch: true, name: () => t('ปักเสร็จพร้อมใช้', 'Fully stitched'), desc: () => t('ร้านปักให้เสร็จ', 'The shop stitches it for you') },
+  { id: 'fabric_kit', material: 'fabric', name: () => t('ชุดปักเอง (ผ้า + ด้าย)', 'Kit (fabric + threads)'), desc: () => t('ผ้าตามที่ลายกำหนด ตัดเผื่อขอบ + ด้ายครบทุกสีตามลาย + เข็ม + แผนผังพิมพ์', 'Fabric as the pattern says, cut with margins + every thread + needle + printed chart') },
+  { id: 'fabric_stitched', material: 'fabric', perStitch: true, name: () => t('ปักเสร็จ', 'Stitched'), desc: () => t('ร้านปักให้เสร็จบนผ้า ไม่ใส่กรอบ', 'The shop stitches it on fabric, unframed') },
+  { id: 'fabric_framed', material: 'fabric', perStitch: true, name: () => t('ปักเสร็จใส่กรอบ', 'Stitched and framed'), desc: () => t('ร้านปักให้เสร็จและใส่กรอบพร้อมแขวน', 'The shop stitches it and frames it, ready to hang') },
 ];
 export const productName = (id: string) => PRODUCTS.find((p) => p.id === id)?.name() ?? id;
+export const productMaterial = (id: string): Material => (id.startsWith('fabric_') ? 'fabric' : '3d');
 
 export const PLASTIC_COLORS = [
   () => t('ขาว', 'White'), () => t('ครีม', 'Cream'), () => t('ดำ', 'Black'), () => t('ชมพูพาสเทล', 'Pastel pink'),
@@ -47,84 +54,51 @@ export const STATUS_LABEL: Record<OrderStatus, () => string> = {
 export const ORDER_STATUSES = Object.keys(STATUS_LABEL) as OrderStatus[];
 export const isClosed = (s: OrderStatus) => s === 'done' || s === 'cancelled';
 
-// ---------- size and price ----------
+// ---------- material and size ----------
 
-/** Size classes by the longest side in mm. Keep in step with order_size() in 0006_orders.sql. */
-export const SIZE_LIMITS: [Size, number][] = [['S', 75], ['M', 120], ['L', 180]];
-export const SIZE_LABEL: Record<Size, () => string> = {
-  S: () => t('เล็ก (ไม่เกิน 7.5 ซม.)', 'Small (up to 7.5 cm)'),
-  M: () => t('กลาง (ไม่เกิน 12 ซม.)', 'Medium (up to 12 cm)'),
-  L: () => t('ใหญ่ (ไม่เกิน 18 ซม.)', 'Large (up to 18 cm)'),
+/** What a pattern would be made as: 3D (printed pieces, templates, models) or fabric; null = neither. */
+export function materialOf(p: Pick<Pattern, 'mode' | 'details'>): Material | null {
+  if (p.mode === 'template' || p.details.baseType === 'print3d') return '3d';
+  if (p.details.baseType === 'aida') return 'fabric';
+  return null;
+}
+
+/** Size classes by the longest side in mm. Keep in step with piece_size() in 0013_rate_cards.sql. */
+export const SIZE_LIMITS: Record<Material, [Size, number][]> = {
+  '3d': [['S', 75], ['M', 120], ['L', 180]],
+  fabric: [['S', 100], ['M', 200], ['L', 300]],
+};
+export const SIZES: Size[] = ['S', 'M', 'L'];
+export const sizeLabel = (m: Material, s: Size) => {
+  const max = SIZE_LIMITS[m].find(([x]) => x === s)![1] / 10;
+  return s === 'S' ? t(`เล็ก (ไม่เกิน ${max} ซม.)`, `Small (up to ${max} cm)`)
+    : s === 'M' ? t(`กลาง (ไม่เกิน ${max} ซม.)`, `Medium (up to ${max} cm)`)
+    : t(`ใหญ่ (ไม่เกิน ${max} ซม.)`, `Large (up to ${max} cm)`);
 };
 
-/** Width and height of the printed piece in mm. */
+/** Width and height of the piece in mm. */
 export const pieceMm = (p: Pick<Pattern, 'cols' | 'rows' | 'pitchMm'>) => ({ w: p.cols * p.pitchMm, h: p.rows * p.pitchMm });
 export const cm = (mm: number) => (mm / 10).toLocaleString(undefined, { maximumFractionDigits: 1 });
 
-export function sizeOf(p: Pick<Pattern, 'cols' | 'rows' | 'pitchMm'>): Size | null {
+export function sizeOf(p: Pick<Pattern, 'cols' | 'rows' | 'pitchMm'>, material: Material = '3d'): Size | null {
   const { w, h } = pieceMm(p);
   const longest = Math.max(w, h);
-  return SIZE_LIMITS.find(([, max]) => longest <= max + 1e-6)?.[0] ?? null;
+  return SIZE_LIMITS[material].find(([, max]) => longest <= max + 1e-6)?.[0] ?? null;
 }
 
 /** Why this pattern can't be ordered, or null when it can. */
 export function cannotOrder(p: Pattern): string | null {
-  if (!(p.details.baseType === 'print3d' || p.mode === 'template')) {
-    return t('ตอนนี้รับผลิตเฉพาะชิ้นงาน 3D ลายบนผ้า Aida ยังสั่งผลิตไม่ได้', 'For now we only make 3D pieces; fabric patterns can’t be ordered yet.');
-  }
+  const m = materialOf(p);
+  if (!m) return t('ลายแบบนี้ยังสั่งผลิตไม่ได้ สั่งได้เฉพาะชิ้นงาน 3D และลายบนผ้า', 'This kind of pattern can’t be ordered yet: only 3D pieces and fabric patterns.');
   if (computeStats(p).total === 0) return t('ลายนี้ยังว่างอยู่ ลงสีก่อนค่อยสั่งผลิต', 'This pattern is still empty. Add some stitches first.');
-  if (!sizeOf(p)) {
+  if (!sizeOf(p, m)) {
     const { w, h } = pieceMm(p);
-    return t(`ชิ้นนี้ใหญ่ ${cm(w)} × ${cm(h)} ซม. เกินที่เราพิมพ์ได้ (ด้านยาวสุดไม่เกิน 18 ซม.)`,
-      `This piece is ${cm(w)} × ${cm(h)} cm, larger than we can print (18 cm on the longest side).`);
+    const max = SIZE_LIMITS[m][2][1] / 10;
+    return m === '3d'
+      ? t(`ชิ้นนี้ใหญ่ ${cm(w)} × ${cm(h)} ซม. เกินที่พิมพ์ได้ (ด้านยาวสุดไม่เกิน ${max} ซม.)`, `This piece is ${cm(w)} × ${cm(h)} cm, larger than can be printed (${max} cm on the longest side).`)
+      : t(`ลายนี้ใหญ่ ${cm(w)} × ${cm(h)} ซม. เกินที่รับผลิต (ด้านยาวสุดไม่เกิน ${max} ซม.)`, `This design is ${cm(w)} × ${cm(h)} cm, larger than shops take (${max} cm on the longest side).`);
   }
   return null;
-}
-
-export interface Pricing {
-  /** 'kit:M' -> baht per piece; for 'stitched:*' it's the starting price before the per-stitch part */
-  prices: Record<string, number>;
-  /** fully stitched: satang added per stitch (0.30 baht -> 30); kept whole so the sum matches the database exactly */
-  stitchRateSatang: number;
-  /** the team shop's shipping fee per order */
-  shipping: number;
-}
-
-/** The team shop's prices (order_config, until shops get their own rate cards) and its shipping fee. */
-export async function loadPricing(): Promise<Pricing> {
-  const c = await client();
-  const [cfg, shop] = await Promise.all([
-    c.from('order_config').select('key, value'),
-    c.from('shops').select('shipping_thb').eq('official', true).maybeSingle(),
-  ]);
-  if (cfg.error) throw new Error(cfg.error.message);
-  const out: Pricing = { prices: {}, stitchRateSatang: NaN, shipping: Number(shop.data?.shipping_thb ?? NaN) };
-  for (const { key, value } of (cfg.data ?? []) as { key: string; value: string }[]) {
-    if (key.startsWith('price:')) out.prices[key.slice(6)] = Number(value);
-    else if (key === 'stitch_rate') out.stitchRateSatang = Math.round(Number(value) * 100);
-  }
-  return out;
-}
-
-/**
- * Baht per piece, as order_unit_price() in the database works it out: blank and kit are a flat price per size;
- * fully stitched is its starting price + the per-stitch rate × stitches, rounded up to a price ending in 9.
- * NaN when a price is missing.
- */
-export function unitPrice(pr: Pricing, product: Product, size: Size, stitches: number): number {
-  const base = pr.prices[`${product}:${size}`];
-  if (!Number.isFinite(base)) return NaN;
-  if (product !== 'stitched') return base;
-  if (!Number.isFinite(pr.stitchRateSatang)) return NaN;
-  const satang = base * 100 + pr.stitchRateSatang * stitches;
-  return Math.ceil((satang + 100) / 1000) * 10 - 1;
-}
-
-/** The same sum the database makes when the order is placed. */
-export function quote(pr: Pricing, product: Product, size: Size, stitches: number, qty: number) {
-  const unit = unitPrice(pr, product, size, stitches);
-  if (!Number.isFinite(unit) || !Number.isFinite(pr.shipping)) return null;
-  return { unit, shipping: pr.shipping, total: unit * qty + pr.shipping };
 }
 
 export const baht = (n: number) => t(`${n.toLocaleString()} บาท`, `฿${n.toLocaleString()}`);
@@ -143,12 +117,26 @@ export function addressProblem(a: Address): string | null {
   return null;
 }
 
+/** Delivery addresses of orders, by code (only yours, or your shop's until 30 days after closing). */
+export async function orderAddresses(codes: string[]): Promise<Map<string, Address>> {
+  const out = new Map<string, Address>();
+  if (!codes.length) return out;
+  const c = await client();
+  const { data, error } = await c.rpc('order_addresses', { codes });
+  if (error) throw new Error(error.message);
+  for (const r of (data ?? []) as { code: string; ship_name: string; ship_phone: string; ship_address: string; ship_postcode: string }[]) {
+    out.set(r.code, { name: r.ship_name, phone: r.ship_phone, address: r.ship_address, postcode: r.ship_postcode });
+  }
+  return out;
+}
+
 /** The address from your latest order, to fill in the next one. */
 export async function lastAddress(): Promise<Address | null> {
   const c = await client();
-  const { data } = await c.from('orders').select('ship_name, ship_phone, ship_address, ship_postcode')
+  const { data } = await c.from('orders').select('code')
     .eq('user_id', getCloud().user?.id ?? '').order('created_at', { ascending: false }).limit(1).maybeSingle();
-  return data ? { name: data.ship_name, phone: data.ship_phone, address: data.ship_address, postcode: data.ship_postcode } : null;
+  if (!data) return null;
+  return (await orderAddresses([data.code])).get(data.code) ?? null;
 }
 
 /** XSD- + 6 characters that are easy to read aloud and type (no 0/O, 1/I). */
@@ -165,6 +153,9 @@ export function friendlyOrderError(message: string): string {
   if (/piece too large/.test(message)) return t('ชิ้นนี้ใหญ่เกินที่เราพิมพ์ได้', 'This piece is larger than we can print.');
   if (/no price set/.test(message)) return t('ยังไม่ได้ตั้งราคาสำหรับแบบนี้ ลองเลือกแบบอื่น', 'This option has no price yet. Try another one.');
   if (/terms not accepted/.test(message)) return t('ต้องยอมรับเงื่อนไขการสั่งซื้อก่อน', 'Please accept the order terms first.');
+  if (/seller terms not accepted/.test(message)) return t('ต้องยอมรับข้อกำหนดผู้ขายก่อนเปิดร้าน', 'Accept the seller terms to open a shop.');
+  if (/rights not confirmed/.test(message)) return t('ยืนยันก่อนว่าคุณมีสิทธิ์ให้ผลิตลายนี้', 'Confirm you may have this design made first.');
+  if (/set up PromptPay first/.test(message)) return t('ตั้งพร้อมเพย์ในตั้งค่าร้านก่อนรับออเดอร์', 'Set up PromptPay in the shop settings before accepting orders.');
   if (/cannot be cancelled/.test(message)) return t('ยกเลิกได้เฉพาะออเดอร์ที่ยังไม่ได้ชำระเงิน', 'Only unpaid orders can be cancelled.');
   if (/shop not taking orders/.test(message)) return t('ร้านนี้ปิดรับออเดอร์อยู่', 'This shop isn’t taking orders right now.');
   if (/shop is busy/.test(message)) return t('ร้านนี้มีออเดอร์เต็มแล้ว ลองใหม่ภายหลัง', 'This shop is full for now. Try again later.');
@@ -178,7 +169,11 @@ export function friendlyOrderError(message: string): string {
   return message;
 }
 
-export interface OrderOptions { product: Product; plasticColor: string; quantity: number; note: string; address: Address }
+export interface OrderOptions {
+  shopId: number; product: Product; plasticColor: string; quantity: number; note: string; address: Address;
+  /** the customer's word that they may have this design made */
+  rightsConfirmed: boolean;
+}
 
 /** Place an order; returns its code. Size and price are worked out again by the database. */
 export async function placeOrder(p: Pattern, o: OrderOptions): Promise<string> {
@@ -194,7 +189,7 @@ export async function placeOrder(p: Pattern, o: OrderOptions): Promise<string> {
     quantity: Math.min(20, Math.max(1, Math.round(o.quantity))), note: o.note.trim().slice(0, 1000), lang,
     ship_name: o.address.name.trim().slice(0, 100), ship_phone: o.address.phone.trim(),
     ship_address: o.address.address.trim().slice(0, 500), ship_postcode: o.address.postcode.trim(),
-    terms_version: ORDER_TERMS_VERSION,
+    terms_version: ORDER_TERMS_VERSION, shop_id: o.shopId, rights_confirmed: o.rightsConfirmed,
   };
   // a clash of two random codes is very unlikely; try once more if it happens
   for (let attempt = 0; attempt < 2; attempt++) {
@@ -223,7 +218,8 @@ export interface Order {
   cancelReason: string; cancelledBy: 'customer' | 'shop' | 'system' | null; refundConfirmed: boolean;
 }
 
-export const ORDER_COLS = 'id, code, created_at, updated_at, user_id, title, template_name, cols, rows, pitch_mm, size, colors, stitches, data, product, plastic_color, quantity, note, ship_name, ship_phone, ship_address, ship_postcode, unit_thb, shipping_thb, total_thb, status, slip_path, slip_at, paid_at, tracking_carrier, tracking_no, shipped_at, closed_at, terms_version, shop_id, accepted_at, cancel_reason, cancelled_by, refund_confirmed';
+// the delivery address isn't a readable column (0013): it comes from orderAddresses()
+export const ORDER_COLS = 'id, code, created_at, updated_at, user_id, title, template_name, cols, rows, pitch_mm, size, colors, stitches, data, product, plastic_color, quantity, note, unit_thb, shipping_thb, total_thb, status, slip_path, slip_at, paid_at, tracking_carrier, tracking_no, shipped_at, closed_at, terms_version, shop_id, accepted_at, cancel_reason, cancelled_by, refund_confirmed';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function toOrder(r: any): Order {
@@ -232,7 +228,7 @@ export function toOrder(r: any): Order {
     title: r.title, templateName: r.template_name, cols: r.cols, rows: r.rows, pitchMm: Number(r.pitch_mm), size: r.size,
     colors: r.colors, stitches: r.stitches, data: r.data,
     product: r.product, plasticColor: r.plastic_color, quantity: r.quantity, note: r.note,
-    address: { name: r.ship_name, phone: r.ship_phone, address: r.ship_address, postcode: r.ship_postcode },
+    address: emptyAddress,
     unit: r.unit_thb, shipping: r.shipping_thb, total: r.total_thb,
     status: r.status, slipPath: r.slip_path, slipAt: r.slip_at, paidAt: r.paid_at,
     trackingCarrier: r.tracking_carrier, trackingNo: r.tracking_no, shippedAt: r.shipped_at, closedAt: r.closed_at,
@@ -266,8 +262,11 @@ export async function myOrderData(): Promise<unknown[]> {
   const { data: msgs, error: mErr } = await c.from('order_messages').select('order_id, created_at, from_team, body')
     .in('order_id', rows.map((r) => r.id)).order('created_at', { ascending: true }).limit(5000);
   if (mErr) throw new Error(mErr.message);
+  // your delivery addresses too (PDPA: a copy of everything about you)
+  const addrs = await orderAddresses(rows.map((r) => r.code as string));
   return rows.map(({ id, user_id: _u, slip_path: slip, ...r }) => ({
     ...r,
+    delivery: addrs.get(r.code as string) ?? null,
     slip_uploaded: !!slip,
     messages: (msgs ?? []).filter((m) => m.order_id === id).map(({ order_id: _o, ...m }) => m),
   }));
@@ -278,7 +277,9 @@ export async function getOrder(code: string): Promise<Order | null> {
   const c = await client();
   const { data, error } = await c.from('orders').select(ORDER_COLS).eq('code', code).maybeSingle();
   if (error) throw new Error(error.message);
-  return data ? toOrder(data) : null;
+  if (!data) return null;
+  const o = toOrder(data);
+  return { ...o, address: (await orderAddresses([code]).catch(() => new Map<string, Address>())).get(code) ?? emptyAddress };
 }
 
 // ---------- the customer's actions ----------
@@ -376,13 +377,5 @@ export async function getTeamNote(orderId: number): Promise<string> {
 export async function saveTeamNote(orderId: number, note: string): Promise<void> {
   const c = await client();
   const { error } = await c.from('order_notes').upsert({ order_id: orderId, note: note.slice(0, 2000) });
-  if (error) throw new Error(error.message);
-}
-
-/** Save the team shop's prices: { 'price:kit:M': '229', stitch_rate: '0.30' } (moderators only). */
-export async function saveConfig(entries: Record<string, string>): Promise<void> {
-  const c = await client();
-  const rows = Object.entries(entries).map(([key, value]) => ({ key, value: value.trim() }));
-  const { error } = await c.from('order_config').upsert(rows);
   if (error) throw new Error(error.message);
 }

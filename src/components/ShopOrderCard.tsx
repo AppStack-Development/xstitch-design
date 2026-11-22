@@ -1,18 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Pattern } from '../types';
 import {
-  ORDER_STATUSES, STATUS_LABEL, baht, cm, getTeamNote, pieceMm, productName, saveTeamNote, sizeOf,
+  ORDER_STATUSES, STATUS_LABEL, baht, cm, getTeamNote, pieceMm, productMaterial, productName, saveTeamNote, sizeOf,
   type Order, type OrderMessage, type OrderStatus,
 } from '../lib/orders';
 import { shopAction, type Shop, type ShopAction } from '../lib/shops';
 import { decodeShare, downloadBlob, safeFilename } from '../lib/share';
 import { buildPlate, toBinaryStl } from '../lib/plate';
 import { computeStats } from '../lib/stats';
-import { modelOf, templateLabel } from '../lib/templates';
+import { modelOf } from '../lib/templates';
 import { t, locale } from '../lib/i18n';
 import { askConfirm } from './ConfirmDialog';
 import { OrderThread } from './OrderThread';
-import { SlipPeek } from '../pages/OrderPage';
+import { SlipPeek, kindLabel } from '../pages/OrderPage';
 import { Thumb } from './Thumb';
 import { Icon } from './Icon';
 
@@ -69,7 +69,8 @@ export function ShopOrderCard({ order, shop, onChanged }: { order: Order; shop: 
     downloadBlob(toBinaryStl(buildPlate(p, p.details.thicknessMm, p.details.holeRatio), o.code), `${o.code}-${safeFilename(o.title)}.stl`);
   };
   // the size the customer paid for, and the stitch count the price was based on, checked against the pattern itself
-  const real = p ? sizeOf(p) : null;
+  const material = productMaterial(o.product);
+  const real = p ? sizeOf(p, material) : null;
   const realStitches = p ? computeStats(p).total : null;
   const { w, h } = p ? pieceMm(p) : pieceMm(o);
   const open = o.status !== 'done' && o.status !== 'cancelled';
@@ -86,12 +87,12 @@ export function ShopOrderCard({ order, shop, onChanged }: { order: Order; shop: 
           <span className={`status-chip ${o.status === 'cancelled' ? 'removed' : o.status === 'done' ? 'published' : 'hidden'}`}>{STATUS_LABEL[o.status]()}</span>
           <span className="review-when">{when(o.createdAt)}</span>
         </div>
-        <div className="post-by"><b>{o.title}</b> <span className="muted">· {templateLabel(o.templateName) ?? '3D'} · {cm(w)} × {cm(h)} {t('ซม.', 'cm')} · {t(`${o.colors} สี`, `${o.colors} ${o.colors === 1 ? 'color' : 'colors'}`)}</span></div>
+        <div className="post-by"><b>{o.title}</b> <span className="muted">· {kindLabel(o, p)} · {cm(w)} × {cm(h)} {t('ซม.', 'cm')} · {t(`${o.colors} สี`, `${o.colors} ${o.colors === 1 ? 'color' : 'colors'}`)}</span></div>
         {real && real !== o.size && <p className="error small">{t(`ขนาดในลายเป็น ${real} แต่ออเดอร์คิดราคาเป็น ${o.size}`, `The pattern is size ${real} but the order was priced as ${o.size}`)}</p>}
         {realStitches !== null && realStitches !== o.stitches && <p className="error small">{t(`ลายนี้มี ${realStitches.toLocaleString()} ฝีเข็ม แต่ออเดอร์บันทึกไว้ ${o.stitches.toLocaleString()} ฝีเข็ม ตรวจราคาก่อนยืนยันรับเงิน`, `The pattern has ${realStitches.toLocaleString()} stitches but the order says ${o.stitches.toLocaleString()}; check the price before confirming payment`)}</p>}
         <ul className="order-facts">
           <li><span>{t('แบบ', 'Product')}</span><b>{productName(o.product)}</b></li>
-          <li><span>{t('สีพลาสติก', 'Plastic')}</span><b>{o.plasticColor || '–'}</b></li>
+          {productMaterial(o.product) === '3d' && <li><span>{t('สีพลาสติก', 'Plastic')}</span><b>{o.plasticColor || '–'}</b></li>}
           <li><span>{t('จำนวน', 'Qty')}</span><b>{o.quantity}</b></li>
           <li><span>{t('ยอด', 'Total')}</span><b>{baht(o.total)}</b></li>
         </ul>
@@ -189,7 +190,7 @@ export function ShopOrderCard({ order, shop, onChanged }: { order: Order; shop: 
         <div className="review-actions">
           <button className="btn sm" onClick={() => run(async () => { await saveTeamNote(o.id, note); setSavedNote(note); }, false)} disabled={busy || note === savedNote}>{t('บันทึกโน้ต', 'Save note')}</button>
           <a className="btn sm" href={`#/s/${o.data}`}><Icon name="edit" size={15} /> {t('เปิดลาย', 'Open pattern')}</a>
-          {p && modelOf(p.templateId)
+          {material === 'fabric' ? null : p && modelOf(p.templateId)
             ? <span className="hint">{t('กล่องปักลาย: พิมพ์จากไฟล์ต้นฉบับของทีม', 'Stitch box: print from the team’s original files')}</span>
             : <button className="btn sm" onClick={stl} disabled={!p}><Icon name="cube" size={15} /> {t('ดาวน์โหลด STL', 'Download STL')}</button>}
           {open && o.status !== 'awaiting_accept' && !ending && (

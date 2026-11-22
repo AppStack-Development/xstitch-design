@@ -28,7 +28,7 @@ import { ImageImportDialog } from '../components/ImageImportDialog';
 import { PublishDialog } from '../components/PublishDialog';
 import { communityEnabled } from '../lib/community';
 import { OrderRequestDialog } from '../components/OrderRequestDialog';
-import { ordersEnabled } from '../lib/orders';
+import { materialOf, ordersEnabled } from '../lib/orders';
 import { computeProgress, reconcileProgress } from '../lib/progress';
 import { navigate } from '../App';
 import { t } from '../lib/i18n';
@@ -319,9 +319,9 @@ export function Editor({ id }: { id: string }) {
               <button onClick={() => doExport('png')}><Icon name="image" /> <span><b>{t('รูปภาพ PNG', 'PNG image')}</b><small>{t('สำหรับส่งให้เพื่อนทาง LINE / โซเชียล', 'To send to friends on LINE / social media')}</small></span></button>
               <button onClick={() => doExport('transfer')}><Icon name="sendOut" /> <span><b>{t('ส่งไปมือถือ / อีกเครื่อง', 'Send to phone / another device')}</b><small>{t('สแกน QR เพื่อปักต่อในมือถือ (รวมความคืบหน้า)', 'Scan the QR to continue stitching on your phone (progress included)')}</small></span></button>
               <button onClick={() => doExport('share')}><Icon name="link" /> <span><b>{t('คัดลอกลิงก์แชร์', 'Copy share link')}</b><small>{t('เพื่อนเปิดดูและบันทึกต่อได้', 'Friends can open it and save a copy')}</small></span></button>
-              {ordersEnabled && (p.details.baseType === 'print3d' || p.mode === 'template') && (
+              {ordersEnabled && materialOf(p) && (
                 <button onClick={() => { setMenu(false); keep(p, true); setOrder(true); }}>
-                  <Icon name="cube" /> <span><b>{t('สั่งผลิต', 'Order this piece')}</b><small>{t('ให้ทีมพิมพ์ชิ้นงานและจัดชุดด้ายส่งถึงบ้าน ดูราคาได้ทันที', 'We print the piece and pack the threads for you; see the price right away')}</small></span>
+                  <Icon name="cube" /> <span><b>{t('สั่งผลิต', 'Have it made')}</b><small>{t('เลือกร้านที่รับผลิตลายนี้ เป็นชุดปักเองหรือปักเสร็จ ดูราคาได้ทันที', 'Pick a shop to make it as a kit or finished piece; see prices right away')}</small></span>
                 </button>
               )}
               {communityEnabled && (

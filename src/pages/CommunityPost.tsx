@@ -225,7 +225,7 @@ export function CommunityPost({ id }: { id: string }) {
         </div>
       </div>
       {reporting && <ReportDialog postId={post.id} onClose={() => setReporting(false)} />}
-      {ordering && p && <OrderRequestDialog pattern={p} onClose={() => setOrdering(false)} />}
+      {ordering && p && <OrderRequestDialog pattern={p} onlyOfficial onClose={() => setOrdering(false)} />}
     </div>
   );
 }

@@ -9,7 +9,7 @@ import { Thumb } from '../components/Thumb';
 import { Icon } from '../components/Icon';
 import { LangSwitch } from '../components/LangSwitch';
 import { TeamBadge, usePostPattern } from '../components/PostCard';
-import { PRODUCTS, SIZE_LIMITS, loadPricing, ordersEnabled, saveConfig } from '../lib/orders';
+import { ordersEnabled } from '../lib/orders';
 
 type Tab = 'open' | 'handled' | 'orders';
 
@@ -212,82 +212,17 @@ function ReviewCard({ item, handled, onDecided }: { item: ReviewItem; handled: b
 
 // ---------- orders ----------
 
-/** The team's side of orders: the team shop's prices here; the orders themselves on the shop page (#/shop). */
+/** The team's side of orders lives on its shop page (#/shop): orders, prices, shipping and PromptPay. */
 function OrdersPanel() {
   return (
-    <>
-      <div className="community-msg shop-handoff">
-        <p><b>{t('ออเดอร์ย้ายไปที่หน้าร้านแล้ว', 'Orders now live on the shop page')}</b></p>
-        <p className="muted">{t('ทุกออเดอร์เป็นของร้าน ร้านของทีมคือ XStitch.Design ทำออเดอร์ ตั้งค่าส่ง และพร้อมเพย์ได้ที่หน้าร้าน',
-          'Every order belongs to a shop; the team’s is XStitch.Design. Work its orders and set its shipping and PromptPay on the shop page.')}</p>
-        <a className="btn primary" href="#/shop"><Icon name="cube" size={16} /> {t('ไปที่ออเดอร์ของร้านทีม', 'Go to the team shop’s orders')}</a>
-      </div>
-      <PricingEditor />
-    </>
-  );
-}
-
-/** The team shop's prices per piece by size, and the per-stitch rate for fully stitched pieces. */
-function PricingEditor() {
-  const [vals, setVals] = useState<Record<string, string> | null>(null);
-  const [saved, setSaved] = useState<Record<string, string>>({});
-  const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState('');
-  useEffect(() => {
-    let live = true;
-    loadPricing().then((p) => {
-      if (!live) return;
-      const v: Record<string, string> = { stitch_rate: Number.isFinite(p.stitchRateSatang) ? (p.stitchRateSatang / 100).toFixed(2) : '' };
-      for (const pr of PRODUCTS) for (const [s] of SIZE_LIMITS) v[`price:${pr.id}:${s}`] = String(p.prices[`${pr.id}:${s}`] ?? '');
-      setVals(v);
-      setSaved(v);
-    }).catch((e) => setMsg((e as Error).message));
-    return () => { live = false; };
-  }, []);
-  if (!vals) return msg ? <p className="error small">{msg}</p> : null;
-  const changed = Object.keys(vals).filter((k) => vals[k] !== saved[k]);
-  const badNumber = Object.keys(vals).some((k) => k.startsWith('price:') && !/^[0-9]{1,6}$/.test(vals[k].trim()));
-  const badRate = !/^[0-9]{1,2}(\.[0-9]{1,2})?$/.test(vals.stitch_rate.trim());
-  const save = async () => {
-    setBusy(true);
-    setMsg('');
-    try {
-      await saveConfig(Object.fromEntries(changed.map((k) => [k, vals[k]])));
-      setSaved({ ...vals });
-      setMsg(t('บันทึกแล้ว ใช้กับออเดอร์ใหม่ตั้งแต่ตอนนี้', 'Saved; applies to new orders from now on.'));
-    } catch (e) {
-      setMsg((e as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  };
-  const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement>) => setVals({ ...vals, [k]: e.target.value });
-  return (
-    <details className="order-pricing" open>
-      <summary><Icon name="edit" size={15} /> {t('ราคาของร้านทีม', 'The team shop’s prices')}<span className="order-pricing-edit">{t('แก้ไข', 'Edit')}</span></summary>
-      <table className="order-price-table">
-        <thead><tr><th>{t('บาท/ชิ้น', 'THB per piece')}</th>{SIZE_LIMITS.map(([s, mm]) => <th key={s}>{s} <small>≤{mm / 10} {t('ซม.', 'cm')}</small></th>)}</tr></thead>
-        <tbody>
-          {PRODUCTS.map((pr) => (
-            <tr key={pr.id}><th>{pr.name()}{pr.id === 'stitched' && <small> {t('(ราคาตั้งต้น)', '(starting price)')}</small>}</th>
-              {SIZE_LIMITS.map(([s]) => <td key={s}><input inputMode="numeric" value={vals[`price:${pr.id}:${s}`]} onChange={set(`price:${pr.id}:${s}`)} aria-label={`${pr.name()} ${s}`} /></td>)}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      <div className="order-pay-fields">
-        <label className="fb-field"><span>{t('ปักเสร็จ: ค่าปักต่อฝีเข็ม (บาท)', 'Fully stitched: per stitch (THB)')}</span><input inputMode="decimal" value={vals.stitch_rate} onChange={set('stitch_rate')} /></label>
-      </div>
-      <p className="hint">{t('ปักเสร็จคิดราคา = ราคาตั้งต้นตามขนาด + ค่าปักต่อฝีเข็ม × จำนวนฝีเข็มของลาย แล้วปัดขึ้นให้ลงท้ายด้วย 9 เช่น 159 + 0.30 × 214 = 223.2 → 229 บาท',
-        'Fully stitched = the starting price for the size + the per-stitch rate × the pattern’s stitches, rounded up to end in 9, e.g. 159 + 0.30 × 214 = 223.2 → 229.')}</p>
-      <p className="hint">{t('ราคาใหม่ใช้กับออเดอร์ที่สั่งหลังบันทึก ออเดอร์เดิมคงราคาเดิม ค่าส่งและพร้อมเพย์อยู่ในหน้าตั้งค่าร้าน',
-        'New prices apply to orders placed after saving; existing orders keep theirs. Shipping and PromptPay are in the shop settings.')}</p>
-      {badNumber && <p className="error small">{t('ราคาต้องเป็นตัวเลขเต็ม', 'Prices must be whole numbers')}</p>}
-      {badRate && <p className="error small">{t('ค่าปักต่อฝีเข็มต้องเป็นตัวเลข ทศนิยมไม่เกิน 2 ตำแหน่ง เช่น 0.30', 'The per-stitch rate must be a number with up to 2 decimals, e.g. 0.30')}</p>}
+    <div className="community-msg shop-handoff">
+      <p><b>{t('ออเดอร์และราคาอยู่ที่หน้าร้านแล้ว', 'Orders and prices now live on the shop page')}</b></p>
+      <p className="muted">{t('ร้านของทีมคือ XStitch.Design ทำออเดอร์ได้ที่แท็บออเดอร์ ตั้งราคา ค่าส่ง และพร้อมเพย์ได้ที่แท็บตั้งค่าร้าน',
+        'The team’s shop is XStitch.Design. Work its orders on the Orders tab; set prices, shipping and PromptPay under Shop settings.')}</p>
       <div className="btn-row">
-        <button className="btn primary sm" onClick={save} disabled={busy || !changed.length || badNumber || badRate}>{busy ? t('กำลังบันทึก…', 'Saving…') : t('บันทึกราคา', 'Save')}</button>
-        {msg && <span className="hint">{msg}</span>}
+        <a className="btn primary" href="#/shop"><Icon name="cube" size={16} /> {t('ออเดอร์ของร้านทีม', 'Team shop orders')}</a>
+        <a className="btn" href="#/shop/settings">{t('ราคาและตั้งค่าร้าน', 'Prices and shop settings')}</a>
       </div>
-    </details>
+    </div>
   );
 }

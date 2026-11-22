@@ -32,6 +32,7 @@ const Moderation = lazy(() => import('./pages/Moderation').then((m) => ({ defaul
 const OrderPage = lazy(() => import('./pages/OrderPage').then((m) => ({ default: m.OrderPage })));
 const OrderTerms = lazy(() => import('./pages/OrderTerms').then((m) => ({ default: m.OrderTerms })));
 const ShopPage = lazy(() => import('./pages/ShopPage').then((m) => ({ default: m.ShopPage })));
+const SellerTerms = lazy(() => import('./pages/SellerTerms').then((m) => ({ default: m.SellerTerms })));
 
 const LIKELY_NEXT = [() => import('./pages/Editor'), () => import('./pages/StitchMode'), () => import('./pages/QuickCreate')];
 function prefetchLikelyPages() {
@@ -104,6 +105,7 @@ function Routes() {
   if (route === 'privacy') return <Privacy />;
   if (route === 'terms') return <Terms />;
   if (route === 'order-terms') return <OrderTerms />;
+  if (route === 'seller-terms') return <SellerTerms />;
   if (route === 'community') return <Community key={arg ?? ''} tag={arg} />;
   if (route === 'moderation') return <Moderation key={arg ?? ''} startTab={arg === 'orders' ? 'orders' : undefined} />;
   if (route === 'order' && arg) return <OrderPage key={arg} code={arg} />;

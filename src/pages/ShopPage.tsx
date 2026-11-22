@@ -5,10 +5,10 @@ import { AccountButton } from '../components/AccountButton';
 import { Icon } from '../components/Icon';
 import { useCloud } from '../lib/cloud';
 import { t } from '../lib/i18n';
-import { promptPayPayload, type Order } from '../lib/orders';
+import { PRODUCTS, SIZES, SIZE_LIMITS, promptPayPayload, type Material, type Order } from '../lib/orders';
 import {
-  STAGES, STAGE_OF, getShopPayment, saveShop, saveShopPayment, shopOrders, shopProblem, shopsIWork,
-  type Shop, type ShopEdit, type ShopPayment, type Stage,
+  STAGES, STAGE_OF, getRates, getShopPayment, openShop, rateKey, saveRates, saveShop, saveShopPayment, shopOrders, shopProblem, shopsIWork,
+  type Rates, type Shop, type ShopEdit, type ShopPayment, type Stage,
 } from '../lib/shops';
 
 /**
@@ -47,13 +47,7 @@ export function ShopPage({ view }: { view: 'orders' | 'settings' }) {
   } else if (err) body = <p className="error">{err}</p>;
   else if (shops === null) body = <StitchLoader label={t('กำลังโหลด…', 'Loading…')} />;
   else if (!shop) {
-    body = (
-      <div className="community-msg">
-        <p><b>{t('คุณยังไม่มีร้าน', 'You don’t have a shop yet')}</b></p>
-        <p className="muted">{t('การเปิดร้านรับผลิตกำลังจะเปิดให้ทุกคนเร็ว ๆ นี้', 'Opening a shop will be open to everyone soon.')}</p>
-        <a className="btn" href="#/account">{t('กลับไปหน้าของฉัน', 'Back to My stuff')}</a>
-      </div>
-    );
+    body = <OpenShop onOpened={() => { setReload((n) => n + 1); location.hash = '#/shop/settings'; }} />;
   } else {
     body = (
       <>
@@ -131,7 +125,12 @@ function ShopOrders({ shop }: { shop: Shop }) {
 }
 
 function ShopSettings({ shop, onSaved }: { shop: Shop; onSaved: () => void }) {
-  const [v, setV] = useState<ShopEdit>({ name: shop.name, about: shop.about, accepting: shop.accepting, leadTime: shop.leadTime, shippingThb: shop.shippingThb });
+  const [v, setV] = useState<ShopEdit>({
+    name: shop.name, about: shop.about, accepting: shop.accepting, leadTime: shop.leadTime, shippingThb: shop.shippingThb,
+    stitchRate: shop.stitchRate, kitNote: shop.kitNote,
+  });
+  const [rateText, setRateText] = useState<Record<string, string> | null>(null);
+  const [rateStr, setRateStr] = useState(shop.stitchRate ? shop.stitchRate.toFixed(2) : '0');
   const [pay, setPay] = useState<ShopPayment | null>(null);
   const [savedPay, setSavedPay] = useState<ShopPayment | null>(null);
   const [busy, setBusy] = useState(false);
@@ -140,9 +139,14 @@ function ShopSettings({ shop, onSaved }: { shop: Shop; onSaved: () => void }) {
   useEffect(() => {
     let live = true;
     getShopPayment(shop.id).then((p) => { if (live) { setPay(p); setSavedPay(p); } }).catch((e) => { if (live) setErr((e as Error).message); });
+    getRates(shop.id).then((r) => { if (live) setRateText(Object.fromEntries(Object.entries(r).map(([k, n]) => [k, String(n)]))); })
+      .catch((e) => { if (live) setErr((e as Error).message); });
     return () => { live = false; };
   }, [shop.id]);
+  const rates: Rates = Object.fromEntries(Object.entries(rateText ?? {}).filter(([, x]) => x.trim() !== '').map(([k, x]) => [k, Number(x)]));
+  const badRate = Object.values(rates).some((n) => !Number.isInteger(n) || n < 1 || n > 100000);
   const problem = shopProblem(v)
+    ?? (badRate ? t('ราคาต้องเป็นตัวเลขเต็ม 1–100,000 บาท (เว้นว่าง = ไม่รับ)', 'Prices are whole numbers, 1–100,000 THB (blank = not offered)') : null)
     ?? (pay?.promptpayId.trim() && !promptPayPayload(pay.promptpayId, 1) ? t('พร้อมเพย์ต้องเป็นเบอร์มือถือ 10 หลัก หรือเลข 13 หลัก', 'PromptPay must be a 10-digit mobile number or a 13-digit id') : null);
   const save = async () => {
     setBusy(true);
@@ -150,6 +154,7 @@ function ShopSettings({ shop, onSaved }: { shop: Shop; onSaved: () => void }) {
     setMsg('');
     try {
       await saveShop(shop.id, v);
+      if (rateText) await saveRates(shop.id, rates);
       if (pay && (pay.promptpayId !== savedPay?.promptpayId || pay.promptpayName !== savedPay?.promptpayName)) {
         await saveShopPayment(shop.id, pay);
         setSavedPay(pay);
@@ -170,6 +175,21 @@ function ShopSettings({ shop, onSaved }: { shop: Shop; onSaved: () => void }) {
         <label className="fb-field"><span>{t('ผลิตเสร็จใน', 'Ready in')}</span><input value={v.leadTime} maxLength={30} placeholder={t('เช่น 5–7 วัน', 'e.g. 5–7 days')} onChange={(e) => setV({ ...v, leadTime: e.target.value })} /></label>
         <label className="fb-field"><span>{t('ค่าส่ง (บาท/ออเดอร์)', 'Shipping (THB per order)')}</span><input inputMode="numeric" value={String(v.shippingThb)} onChange={(e) => setV({ ...v, shippingThb: Number(e.target.value.replace(/[^0-9]/g, '') || 0) })} /></label>
       </div>
+      <h4>{t('ราคารับผลิต', 'Your prices')}</h4>
+      <p className="hint">{t('ใส่ราคาเฉพาะสินค้าและขนาดที่ร้านทำได้ ช่องที่เว้นว่างลูกค้าจะสั่งไม่ได้ ราคานี้ใช้ทั้งลายที่ลูกค้าออกแบบเองและส่งมาให้ผลิต',
+        'Fill in only what your shop makes; blank = not offered. These prices apply to designs customers bring you.')}</p>
+      {rateText === null ? <p className="muted small">{t('กำลังโหลด…', 'Loading…')}</p> : (['3d', 'fabric'] as Material[]).map((m) => (
+        <RateCard key={m} material={m} text={rateText} onChange={(k, x) => setRateText({ ...rateText, [k]: x.replace(/[^0-9]/g, '') })} />
+      ))}
+      <div className="order-pay-fields">
+        <label className="fb-field"><span>{t('งานปักเสร็จ: บวกค่าปักต่อฝีเข็ม (บาท)', 'Stitched pieces: add per stitch (THB)')}</span>
+          <input inputMode="decimal" value={rateStr} onChange={(e) => { setRateStr(e.target.value); setV({ ...v, stitchRate: Number(e.target.value) || 0 }); }} /></label>
+        <label className="fb-field"><span>{t('ในชุดปักของร้านมีอะไรบ้าง (ไม่บังคับ)', 'What your kits include (optional)')}</span>
+          <input value={v.kitNote} maxLength={300} placeholder={t('เช่น ผ้า ด้าย DMC เข็ม สะดึง 6 นิ้ว', 'e.g. fabric, DMC threads, needle, 6" hoop')} onChange={(e) => setV({ ...v, kitNote: e.target.value })} /></label>
+      </div>
+      <p className="hint">{t('งานปักเสร็จคิดราคา = ราคาตั้งต้นตามขนาด + ค่าปักต่อฝีเข็ม × จำนวนฝีเข็มของลาย แล้วปัดขึ้นให้ลงท้ายด้วย 9 เช่น 159 + 0.30 × 214 = 223.2 → 229 บาท',
+        'Stitched pieces = the price for the size + the per-stitch rate × the pattern’s stitches, rounded up to end in 9, e.g. 159 + 0.30 × 214 = 223.2 → 229.')}</p>
+
       <label className="check"><input type="checkbox" checked={v.accepting} onChange={(e) => setV({ ...v, accepting: e.target.checked })} />
         <span>{t('เปิดรับออเดอร์', 'Taking orders')} <small>{t('ปิดไว้ถ้าคิวเต็มหรือไม่อยู่ ออเดอร์ที่ค้างอยู่ยังทำต่อได้', 'Turn off when you’re full or away; open orders carry on.')}</small></span></label>
 
@@ -182,12 +202,75 @@ function ShopSettings({ shop, onSaved }: { shop: Shop; onSaved: () => void }) {
       )}
       <p className="hint">{t('ลูกค้าเห็นพร้อมเพย์เฉพาะออเดอร์ที่ร้านรับแล้วและยังรอชำระเงิน เงินโอนเข้าบัญชีร้านโดยตรง เว็บไม่ได้ถือเงินแทน',
         'Customers see your PromptPay only on orders you’ve accepted that are waiting for payment. Money goes straight to you; the site never holds it.')}</p>
-      {shop.official && <p className="hint">{t('ราคาของร้านทีมตั้งในหน้าทีม', 'The team shop’s prices are set on the team page.')} <a className="acct-link" href="#/moderation/orders">{t('ไปหน้าราคา', 'Go to prices')}</a></p>}
       {problem && <p className="error small">{problem}</p>}
       {err && <p className="error small">{err}</p>}
       <div className="btn-row">
         <button className="btn primary" disabled={busy || !!problem} onClick={save}>{busy ? t('กำลังบันทึก…', 'Saving…') : t('บันทึก', 'Save')}</button>
         {msg && <span className="hint">{msg}</span>}
+      </div>
+    </section>
+  );
+}
+
+/** One material's prices: products down the side, sizes across; blank = not offered. */
+function RateCard({ material, text, onChange }: { material: Material; text: Record<string, string>; onChange: (key: string, value: string) => void }) {
+  const products = PRODUCTS.filter((p) => p.material === material);
+  return (
+    <div className="rate-card">
+      <b>{material === '3d' ? t('ชิ้นงานพิมพ์ 3D', '3D-printed pieces') : t('ลายบนผ้า', 'On fabric')}</b>
+      <table className="order-price-table">
+        <thead><tr><th>{t('บาท/ชิ้น', 'THB per piece')}</th>{SIZES.map((s) => <th key={s}>{s} <small>≤{SIZE_LIMITS[material].find(([x]) => x === s)![1] / 10} {t('ซม.', 'cm')}</small></th>)}</tr></thead>
+        <tbody>
+          {products.map((p) => (
+            <tr key={p.id}>
+              <th>{p.name()}{p.perStitch && <small> {t('(ราคาตั้งต้น)', '(base price)')}</small>}</th>
+              {SIZES.map((s) => {
+                const k = rateKey(p.id, s);
+                return <td key={s}><input inputMode="numeric" placeholder="–" value={text[k] ?? ''} onChange={(e) => onChange(k, e.target.value)} aria-label={`${p.name()} ${s}`} /></td>;
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+/** Open a shop: a name, PromptPay (can come later) and the seller terms; prices are set next. */
+function OpenShop({ onOpened }: { onOpened: () => void }) {
+  const [name, setName] = useState('');
+  const [pay, setPay] = useState<ShopPayment>({ promptpayId: '', promptpayName: '' });
+  const [agree, setAgree] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const badPP = !!pay.promptpayId.trim() && !promptPayPayload(pay.promptpayId, 1);
+  const go = async () => {
+    setBusy(true);
+    setErr('');
+    try { await openShop(name, pay); onOpened(); } catch (e) { setErr((e as Error).message); setBusy(false); }
+  };
+  return (
+    <section className="order-card-box shop-settings">
+      <h3><Icon name="cube" size={18} /> {t('เปิดร้านรับผลิต', 'Open a shop')}</h3>
+      <p className="muted">{t('รับผลิตลายที่ลูกค้าออกแบบเองเป็นชิ้นงาน 3D หรือลายบนผ้า ตั้งราคาเอง ลูกค้าโอนเข้าพร้อมเพย์ของร้านโดยตรง เว็บไม่ได้ถือเงินแทนและไม่เก็บค่าธรรมเนียม',
+        'Make customers’ own designs as 3D pieces or on fabric, at your own prices. Customers pay your PromptPay directly; the site never holds the money and takes no fee.')}</p>
+      <label className="fb-field"><span>{t('ชื่อร้าน', 'Shop name')}</span><input value={name} maxLength={60} onChange={(e) => setName(e.target.value)} placeholder={t('เช่น ปักเพลิน Studio', 'e.g. Little Cross Studio')} /></label>
+      <div className="order-pay-fields">
+        <label className="fb-field"><span>{t('พร้อมเพย์ (ใส่ภายหลังได้)', 'PromptPay (can add later)')}</span><input inputMode="numeric" autoComplete="off" value={pay.promptpayId} onChange={(e) => setPay({ ...pay, promptpayId: e.target.value })} /></label>
+        <label className="fb-field"><span>{t('ชื่อบัญชีที่ลูกค้าจะเห็น', 'Account name customers see')}</span><input value={pay.promptpayName} maxLength={100} onChange={(e) => setPay({ ...pay, promptpayName: e.target.value })} /></label>
+      </div>
+      <ul className="shop-open-notes small">
+        <li>{t('ร้านจะเริ่มแสดงให้ลูกค้าเห็นเมื่อใส่ราคาและพร้อมเพย์แล้ว', 'Your shop shows to customers once it has prices and PromptPay.')}</li>
+        <li>{t('ร้านใหม่รับออเดอร์ที่ยังไม่ปิดได้ครั้งละ 3 ออเดอร์ จนส่งสำเร็จครบ 3 ออเดอร์แรก', 'A new shop holds up to 3 open orders at a time until it has delivered 3.')}</li>
+        <li>{t('ร้านเห็นชื่อ เบอร์โทร และที่อยู่ลูกค้าเฉพาะออเดอร์ของร้าน ใช้ได้เพื่อผลิตและจัดส่งออเดอร์นั้นเท่านั้น', 'You see a customer’s name, phone and address only on your orders, to make and send that order only.')}</li>
+      </ul>
+      <label className="check"><input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} />
+        <span>{t(<>ฉันอ่านและยอมรับ <a href="#/seller-terms" target="_blank" rel="noopener">ข้อกำหนดผู้ขาย</a> แล้ว</>, <>I’ve read and accept the <a href="#/seller-terms" target="_blank" rel="noopener">seller terms</a></>)}</span></label>
+      {badPP && <p className="error small">{t('พร้อมเพย์ต้องเป็นเบอร์มือถือ 10 หลัก หรือเลข 13 หลัก', 'PromptPay must be a 10-digit mobile number or a 13-digit id')}</p>}
+      {err && <p className="error small">{err}</p>}
+      <div className="btn-row">
+        <button className="btn primary" disabled={busy || name.trim().length < 2 || !agree || badPP} onClick={go}>{busy ? t('กำลังเปิดร้าน…', 'Opening…') : t('เปิดร้าน', 'Open shop')}</button>
+        <a className="btn" href="#/account">{t('ไว้ทีหลัง', 'Not now')}</a>
       </div>
     </section>
   );
