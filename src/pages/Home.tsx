@@ -280,7 +280,7 @@ export function Home() {
         </div>
         {!items.length && (
           <div className="empty-invite">
-            <StitchArt kind="hoop" />
+            <StitchArt kind="start" />
             <div>
               <h3>{t('เริ่มลายแรกของคุณ', 'Start your first pattern')}</h3>
               <p className="muted">{t('สร้างลายจากรูปที่ชอบ หรือกด “ลองปัก” ลายตัวอย่างด้านบนได้เลย ลายที่ปักหรือแก้จะเก็บไว้ที่นี่', 'Make one from a photo you like, or tap “Stitch it” on a sample above. Patterns you stitch or edit are kept here.')}</p>

@@ -128,7 +128,7 @@ export function Community({ tag: initialTag }: { tag?: string }) {
             )}
             {!err && !loading && !posts.length && (
               <div className="community-msg">
-                <StitchArt kind="hoop" size={72} />
+                <StitchArt kind="start" size={72} />
                 <p><b>{t('ยังไม่มีลายในหมวดนี้', 'No patterns here yet')}</b></p>
                 <p className="muted">{t('เป็นคนแรกที่แชร์ลายของคุณ', 'Be the first to share yours.')}</p>
                 <button className="btn primary" onClick={() => setSharing(true)}><Icon name="send" size={16} /> {t('แชร์ลายของคุณ', 'Share your pattern')}</button>

@@ -4,30 +4,30 @@
  * action, never loops, and is turned off when the device asks for less motion.
  */
 
-/* ---------- hero: text + a heart that stitches itself, over a faint Aida weave behind it ---------- */
-.hero { position: relative; display: flex; align-items: center; gap: 32px; }
-.hero::before {
-  content: ""; position: absolute; inset: 0; pointer-events: none;
-  background-image: radial-gradient(#ddd3bf 1.1px, transparent 1.4px); background-size: 9px 9px;
-  -webkit-mask-image: radial-gradient(ellipse 380px 210px at calc(100% - 130px) 55%, #000 20%, transparent 72%);
-  mask-image: radial-gradient(ellipse 380px 210px at calc(100% - 130px) 55%, #000 20%, transparent 72%);
-}
-.hero-text { position: relative; flex: 1; min-width: 0; }
-.hero-stitch { position: relative; flex-shrink: 0; width: 168px; height: auto; margin-right: 28px; }
+/* ---------- hero: text + a seasonal picture that stitches itself on a patch of Aida (HeroStitch, lib/heroMotifs) ---------- */
+.hero { position: relative; display: flex; align-items: center; gap: 32px; overflow-x: clip; } /* effects never cause sideways scroll */
+.hero-text { position: relative; z-index: 1; flex: 1; min-width: 0; } /* the fabric fades out behind the text, never over it */
+.hero-art { position: relative; z-index: 0; flex-shrink: 0; width: 168px; height: 168px; margin-right: 28px; }
+.hero-stitch { display: block; width: 100%; height: 100%; overflow: visible; }
+.hero-fx { position: absolute; inset: 0; pointer-events: none; }
+.hs-p { position: absolute; line-height: 1; pointer-events: none; }
 .hs-holes circle { fill: #d8cfbe; }
 .hs-x { transform-box: fill-box; transform-origin: center; }
-.hs-x line { stroke-width: 3.2; stroke-linecap: round; }
-.hs-x .under { stroke: #a3202f; }
-.hs-x .over { stroke: var(--thread); }
+.hs-x line { stroke-width: 2.7; stroke-linecap: round; }
 .hero-stitch.play .hs-x { animation: hs-in .22s ease-out both; }
 @keyframes hs-in { from { opacity: 0; transform: scale(.4); } to { opacity: 1; transform: none; } }
+/* Loy Krathong: the krathong bobs on the water a few times, the water ripples, the candle flickers, then all settle */
+.hs-bob { transform-box: fill-box; transform-origin: 50% 100%; }
+.hero-stitch.floating .hs-bob { animation: hs-bob 2.4s ease-in-out 4; }
+.hero-stitch.floating .hs-wave { animation: hs-wave 1.2s ease-in-out 8 alternate; }
+.hero-stitch.floating .hs-flame line { animation: hs-flame .45s ease-in-out 14 alternate; }
+@keyframes hs-bob { 0%, 100% { transform: translateY(0) rotate(0); } 25% { transform: translateY(-2.5px) rotate(-2deg); } 75% { transform: translateY(1px) rotate(2deg); } }
+@keyframes hs-wave { to { transform: translateX(3px); } }
+@keyframes hs-flame { to { opacity: .35; } }
 @media (max-width: 600px) {
   .hero { flex-direction: column-reverse; align-items: flex-start; gap: 14px; }
-  .hero-stitch { width: 92px; margin: 0; }
-  .hero::before {
-    -webkit-mask-image: radial-gradient(ellipse 180px 120px at 62px 70px, #000 20%, transparent 72%);
-    mask-image: radial-gradient(ellipse 180px 120px at 62px 70px, #000 20%, transparent 72%);
-  }
+  .hero-art { width: 92px; height: 92px; margin: 0; }
+  .hero-stitch.motif-songkran { transform: scaleX(-1); } /* the water gun aims away from the screen's edge */
 }
 
 /* ---------- running-stitch line under the home page's section headings ---------- */
@@ -87,6 +87,8 @@
 
 @media (prefers-reduced-motion: reduce) {
   .hero-stitch.play .hs-x { animation: none; }
+  .hero-stitch.floating .hs-bob, .hero-stitch.floating .hs-wave, .hero-stitch.floating .hs-flame line { animation: none; }
+  .hero-fx { display: none; }
   .home .card, .mode-card, .sample-card { transition: none; }
   .home .card:hover, .mode-card:hover, .sample-card:hover { transform: none; }
   .cross-burst { display: none; }
