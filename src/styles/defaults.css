@@ -55,7 +55,6 @@ details.imp-sec > summary:focus-visible { outline: 2px solid #243b6b55; outline-
    Image-to-pattern dialog on phones: always-visible action bar,
    edge fade + "more options" cue while there is more below
    ================================================================ */
-.modal.import { max-height: calc(100vh - 32px); max-height: calc(100dvh - 32px); }
 .more-cue { display: none; }
 @media (max-width: 900px) {
   .modal.import .modal-foot {

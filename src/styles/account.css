@@ -109,7 +109,7 @@
 /* ---------- the shared confirmation box (components/ConfirmDialog.tsx) ---------- */
 .confirm-back { z-index: 60; } /* above any dialog that asked */
 .modal.confirm-dialog { width: min(420px, 100%); }
-.confirm-body { display: flex; align-items: flex-start; gap: 14px; padding: 20px 18px 18px; } /* sides match .modal-foot */
+.confirm-body { display: flex; align-items: flex-start; gap: 14px; padding: 20px 18px 18px; overflow-y: auto; min-height: 0; } /* sides match .modal-foot */
 .confirm-icon {
   flex-shrink: 0; width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center;
   background: #243b6b14; color: var(--brand);

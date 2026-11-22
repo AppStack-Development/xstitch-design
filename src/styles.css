@@ -306,14 +306,18 @@ textarea { resize: vertical; }
 .card-actions { align-items: center; }
 .card-actions .spacer { flex: 1; }
 
-/* image import dialog */
-.modal-back { position: fixed; inset: 0; background: #1f2a4459; z-index: 50; display: grid; place-items: center; padding: 16px; }
-.modal { width: min(980px, 100%); max-height: calc(100vh - 32px); background: var(--paper); border-radius: 18px; box-shadow: 0 24px 80px #1f2a4440; display: flex; flex-direction: column; overflow: hidden; }
+/* every dialog (image import, order, publish, confirm, size…): .modal-back + .modal */
+.modal-back { position: fixed; inset: 0; background: #1f2a4459; z-index: 50; display: grid; place-items: center; padding: 16px; overscroll-behavior: contain; }
+/* phone browsers count 100vh with their address/tool bars hidden, so a dialog sized by it ran under the bars,
+   its header and buttons cut off; dvh is the height actually showing (vh stays as the fallback) */
+.modal { width: min(980px, 100%); max-height: calc(100vh - 32px); max-height: calc(100dvh - 32px); background: var(--paper); border-radius: 18px; box-shadow: 0 24px 80px #1f2a4440; display: flex; flex-direction: column; overflow: hidden; }
 .modal-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; border-bottom: 1px solid var(--line); }
 .modal-head h3 { display: flex; align-items: center; gap: 8px; font-size: 17px; }
 .modal-body { display: grid; grid-template-columns: 320px 1fr; min-height: 0; overflow: hidden; flex: 1; }
 .modal-foot { display: flex; align-items: center; gap: 10px; padding: 12px 18px; border-top: 1px solid var(--line); }
 .modal-foot .hint { margin: 0; }
+/* when a dialog is taller than the screen only its middle scrolls: the title and the buttons always show */
+.modal > .modal-head, .modal > .modal-foot { flex-shrink: 0; }
 .drop-zone { margin: 20px; min-height: 320px; border: 2px dashed var(--line-2); border-radius: 16px; background: #fbf8f2; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; cursor: pointer; color: var(--ink-2); padding: 24px; text-align: center; }
 .drop-zone b { color: var(--ink); font-size: 16px; }
 .drop-zone.over, .drop-zone:hover { border-color: var(--brand); background: #243b6b08; }
