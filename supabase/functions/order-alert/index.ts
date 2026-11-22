@@ -6,6 +6,9 @@
 // before sending, so every email goes out at most once however often this is called. Only events from the
 // last 24 hours count, so older orders never get late emails.
 //
+// Every order belongs to a shop (migration 0012). Shop emails go to the team inbox for the team's own shop and
+// to the shop owner's account email for any other shop; customer emails name the shop.
+//
 // Secrets (Edge Functions → Secrets): RESEND_API_KEY (required). Optional: TEAM_EMAIL, ALERT_FROM, SITE_URL.
 // SUPABASE_URL and the server keys (SUPABASE_SECRET_KEYS / SUPABASE_SERVICE_ROLE_KEY) are provided by Supabase.
 
@@ -37,9 +40,11 @@ interface Order {
   id: number; code: string; title: string; product: string; quantity: number; total_thb: number; status: string;
   created_at: string; updated_at: string; slip_at: string | null; paid_at: string | null; shipped_at: string | null;
   tracking_carrier: string; tracking_no: string; lang: Lang | null; user_id: string | null;
+  shop_id: number | null; accepted_at: string | null; cancel_reason: string; cancelled_by: string | null;
 }
+interface Shop { id: number; name: string; official: boolean; owner_id: string; lead_time: string }
 interface Message { id: number; order_id: number; created_at: string; from_team: boolean; body: string }
-interface Mail { key: string; to: 'team' | 'customer'; at: string | null; subject: string; lines: string[]; link: string; cta: string }
+interface Mail { key: string; to: 'shop' | 'customer'; at: string | null; subject: string; lines: string[]; link: string; cta: string }
 
 const PRODUCT: Record<string, [string, string]> = {
   kit: ['ชุดปักเอง', 'Stitch-it-yourself kit'],
@@ -50,44 +55,65 @@ const baht = (n: number, l: Lang) => (l === 'th' ? `${n.toLocaleString('th-TH')}
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
 const clip = (s: string, n = 600) => (s.length > n ? s.slice(0, n) + '…' : s);
 
-/** Every email the order's current state calls for. Team emails are in Thai; customer emails follow the order's language. */
-function dueMails(o: Order, msg: Message | null): Mail[] {
+/**
+ * Every email the order's current state calls for. Shop emails are in Thai; customer emails follow the order's
+ * language and name the shop.
+ */
+function dueMails(o: Order, shop: Shop | null, msg: Message | null): Mail[] {
   const l: Lang = o.lang === 'en' ? 'en' : 'th';
   const tr = (th: string, en: string) => (l === 'th' ? th : en);
   const orderLink = `${SITE}/#/order/${o.code}`;
-  const teamLink = `${SITE}/#/moderation/orders`;
+  const shopLink = `${SITE}/#/shop`;
+  const name = shop?.name ?? 'XStitch.Design';
+  const byShop = tr(`ร้าน ${name}`, name);
   const what = `${o.title} · ${PRODUCT[o.product]?.[0] ?? o.product} × ${o.quantity}`;
   const out: Mail[] = [];
-  const team = (key: string, at: string | null, subject: string, lines: string[]) =>
-    out.push({ key: `${key}:team`, to: 'team', at, subject, lines, link: teamLink, cta: 'เปิดหน้าทีม' });
+  // the key suffix stays ":team" so emails already sent before shops existed aren't sent again
+  const toShop = (key: string, at: string | null, subject: string, lines: string[]) =>
+    out.push({ key: `${key}:team`, to: 'shop', at, subject, lines, link: shopLink, cta: 'เปิดหน้าร้าน' });
   const customer = (key: string, at: string | null, subject: string, lines: string[]) =>
     out.push({ key: `${key}:customer`, to: 'customer', at, subject, lines, link: orderLink, cta: tr('เปิดหน้าออเดอร์', 'Open your order') });
+  const waitingForShop = !o.accepted_at && (o.status === 'awaiting_accept' || o.cancelled_by === 'shop');
 
   // placed
-  team('new', o.created_at, `ออเดอร์ใหม่ ${o.code} · ${baht(o.total_thb, 'th')}`,
-    [what, `ยอด ${baht(o.total_thb, 'th')} · รอลูกค้าชำระและแนบสลิป`]);
-  customer('new', o.created_at, tr(`ได้รับออเดอร์ ${o.code} แล้ว`, `We've got your order ${o.code}`), [
-    tr(`ขอบคุณที่สั่ง “${o.title}” กับเรา`, `Thanks for ordering “${o.title}”.`),
-    tr(`ชำระ ${baht(o.total_thb, l)} ผ่านพร้อมเพย์ได้ในหน้าออเดอร์ แล้วแนบสลิปในหน้าเดียวกัน ทีมจะเริ่มผลิตหลังตรวจสลิปแล้ว`,
-      `Pay ${baht(o.total_thb, l)} by PromptPay on your order page and attach the slip there. We start making it once the payment is checked.`),
+  toShop('new', o.created_at, `ออเดอร์ใหม่ ${o.code} · ${baht(o.total_thb, 'th')}`,
+    [what, waitingForShop ? `ยอด ${baht(o.total_thb, 'th')} · รอร้านกดรับหรือปฏิเสธในหน้าร้าน` : `ยอด ${baht(o.total_thb, 'th')} · รอลูกค้าชำระและแนบสลิป`]);
+  customer('new', o.created_at, tr(`ได้รับออเดอร์ ${o.code} แล้ว`, `We've got your order ${o.code}`), waitingForShop ? [
+    tr(`ส่งคำสั่งซื้อ “${o.title}” ให้${byShop} แล้ว`, `Your order for “${o.title}” has gone to ${byShop}.`),
+    tr('รอร้านตอบรับ ปกติภายใน 3 วัน ร้านรับแล้วจะมีอีเมลแจ้ง และเห็นช่องทางชำระเงินในหน้าออเดอร์ ยังไม่ต้องโอนเงินตอนนี้',
+      'Wait for the shop to accept, usually within 3 days. You’ll get an email and the payment details on your order page then. Don’t pay yet.'),
+  ] : [
+    tr(`ขอบคุณที่สั่ง “${o.title}” กับ${byShop}`, `Thanks for ordering “${o.title}” from ${byShop}.`),
+    tr(`ชำระ ${baht(o.total_thb, l)} ผ่านพร้อมเพย์ได้ในหน้าออเดอร์ แล้วแนบสลิปในหน้าเดียวกัน ร้านจะเริ่มผลิตหลังตรวจสลิปแล้ว`,
+      `Pay ${baht(o.total_thb, l)} by PromptPay on your order page and attach the slip there. The shop starts making it once the payment is checked.`),
     tr('ออเดอร์ที่ไม่ชำระภายใน 7 วันอาจถูกยกเลิก', 'Orders not paid within 7 days may be cancelled.'),
   ]);
 
+  // accepted by the shop (not for shops that accept by themselves)
+  if (o.accepted_at && Date.parse(o.accepted_at) - Date.parse(o.created_at) > 5000) {
+    customer('accepted', o.accepted_at, tr(`${byShop} รับออเดอร์ ${o.code} แล้ว`, `${name} accepted your order ${o.code}`), [
+      tr(`ชำระ ${baht(o.total_thb, l)} ผ่านพร้อมเพย์ของร้านได้ในหน้าออเดอร์ แล้วแนบสลิปในหน้าเดียวกัน`,
+        `Pay ${baht(o.total_thb, l)} to the shop by PromptPay on your order page and attach the slip there.`),
+      tr('เงินโอนเข้าบัญชีของร้านโดยตรง', 'The money goes straight to the shop.'),
+    ]);
+  }
+
   // slip sent / slip not accepted
   if (o.slip_at && o.status === 'payment_review') {
-    team(`slip:${o.slip_at}`, o.slip_at, `สลิปใหม่ ${o.code} รอตรวจ`, [what, `ตรวจสลิปให้ได้ ${baht(o.total_thb, 'th')}`]);
+    toShop(`slip:${o.slip_at}`, o.slip_at, `สลิปใหม่ ${o.code} รอตรวจ`, [what, `ตรวจสลิปให้ได้ ${baht(o.total_thb, 'th')}`]);
   }
   if (o.slip_at && o.status === 'awaiting_payment') {
     customer(`reslip:${o.slip_at}`, o.updated_at, tr(`ขอสลิปใหม่สำหรับออเดอร์ ${o.code}`, `Please send a new slip for ${o.code}`), [
-      tr('ทีมตรวจสลิปแล้วยังไม่ผ่าน ดูเหตุผลในข้อความจากทีม แล้วแนบสลิปใหม่ในหน้าออเดอร์', 'We couldn’t match your slip. See the team’s message on your order page and attach a new slip there.'),
+      tr('ร้านตรวจสลิปแล้วยังไม่ผ่าน ดูเหตุผลในข้อความจากร้าน แล้วแนบสลิปใหม่ในหน้าออเดอร์', 'The shop couldn’t match your slip. See its message on your order page and attach a new slip there.'),
     ]);
   }
 
   // paid
   if (o.paid_at && ['paid', 'in_production', 'shipped', 'done'].includes(o.status)) {
+    const lead = shop?.lead_time ? tr(` ปกติเสร็จภายใน ${shop.lead_time}`, ` It’s usually ready in ${shop.lead_time}.`) : '';
     customer('paid', o.paid_at, tr(`ยืนยันการชำระเงินออเดอร์ ${o.code} แล้ว`, `Payment confirmed for ${o.code}`), [
-      tr(`ได้รับเงิน ${baht(o.total_thb, l)} แล้ว ทีมจะเริ่มผลิต “${o.title}” ปกติจัดส่งภายใน 5–7 วันทำการ`,
-        `We've received ${baht(o.total_thb, l)} and will start making “${o.title}”. We usually ship within 5–7 working days.`),
+      tr(`${byShop} ได้รับเงิน ${baht(o.total_thb, l)} แล้ว และจะเริ่มผลิต “${o.title}”${lead}`,
+        `${name} has received ${baht(o.total_thb, l)} and will start making “${o.title}”.${lead}`),
     ]);
   }
 
@@ -97,26 +123,34 @@ function dueMails(o: Order, msg: Message | null): Mail[] {
     customer(`shipped:${o.tracking_no}`, o.updated_at, tr(`ส่งออเดอร์ ${o.code} แล้ว`, `Your order ${o.code} is on its way`), [
       tr(`“${o.title}” ส่งออกไปแล้ว`, `“${o.title}” has been sent.`),
       ...(track ? [tr(`เลขพัสดุ: ${track}`, `Tracking: ${track}`)] : []),
-      tr('ได้รับของแล้วกด “ได้รับของแล้ว” ในหน้าออเดอร์ ถ้าชิ้นงานมีปัญหา แจ้งในหน้าออเดอร์ภายใน 7 วัน',
-        'When it arrives, tap “Received” on your order page. If anything’s wrong, tell us there within 7 days.'),
+      tr('ได้รับของแล้วกด “ได้รับของแล้ว” ในหน้าออเดอร์ ถ้าชิ้นงานมีปัญหา แจ้งร้านในหน้าออเดอร์ภายใน 7 วัน',
+        'When it arrives, tap “Received” on your order page. If anything’s wrong, tell the shop there within 7 days.'),
     ]);
   }
 
-  // cancelled
+  // cancelled (or declined)
   if (o.status === 'cancelled') {
-    team('cancelled', o.updated_at, `ออเดอร์ ${o.code} ถูกยกเลิก`, [what, o.paid_at ? 'ออเดอร์นี้ชำระแล้ว ต้องคืนเงินลูกค้า' : 'ยังไม่ได้ชำระเงิน']);
-    customer('cancelled', o.updated_at, tr(`ออเดอร์ ${o.code} ถูกยกเลิกแล้ว`, `Order ${o.code} has been cancelled`), [
+    const why = o.cancel_reason ? [tr(`เหตุผล: ${o.cancel_reason}`, `Reason: ${o.cancel_reason}`)] : [];
+    if (o.cancelled_by !== 'shop') {
+      toShop('cancelled', o.updated_at, `ออเดอร์ ${o.code} ถูกยกเลิก`, [what,
+        o.cancelled_by === 'customer' ? 'ลูกค้ายกเลิกเอง' : 'ยกเลิกแล้ว',
+        o.paid_at ? 'ออเดอร์นี้ชำระแล้ว ต้องคืนเงินลูกค้า' : 'ยังไม่ได้ชำระเงิน']);
+    }
+    customer('cancelled', o.updated_at, o.cancelled_by === 'shop' && !o.accepted_at
+      ? tr(`${byShop} ไม่ได้รับออเดอร์ ${o.code}`, `${name} couldn’t take your order ${o.code}`)
+      : tr(`ออเดอร์ ${o.code} ถูกยกเลิกแล้ว`, `Order ${o.code} has been cancelled`), [
       tr(`ออเดอร์ “${o.title}” ถูกยกเลิกแล้ว`, `Your order for “${o.title}” has been cancelled.`),
-      ...(o.paid_at ? [tr('คุณชำระเงินแล้ว ทีมจะคืนเงินภายใน 7 วันทำการ ดูรายละเอียดในข้อความในหน้าออเดอร์', 'You had paid, so we’ll refund you within 7 working days; see the messages on your order page.')] : []),
+      ...why,
+      ...(o.paid_at ? [tr('คุณชำระเงินแล้ว ร้านต้องคืนเงินให้คุณ ดูรายละเอียดในข้อความในหน้าออเดอร์', 'You had paid, so the shop owes you a refund; see the messages on your order page.')] : []),
     ]);
   }
 
   // a new message goes to the other side
   if (msg) {
     if (msg.from_team) {
-      customer(`msg:${msg.id}`, msg.created_at, tr(`ทีมตอบข้อความในออเดอร์ ${o.code}`, `New message about ${o.code}`), [clip(msg.body)]);
+      customer(`msg:${msg.id}`, msg.created_at, tr(`${byShop} ตอบข้อความในออเดอร์ ${o.code}`, `New message from ${name} about ${o.code}`), [clip(msg.body)]);
     } else {
-      team(`msg:${msg.id}`, msg.created_at, `ข้อความจากลูกค้า ${o.code}`, [what, clip(msg.body)]);
+      toShop(`msg:${msg.id}`, msg.created_at, `ข้อความจากลูกค้า ${o.code}`, [what, clip(msg.body)]);
     }
   }
   return out;
@@ -133,12 +167,13 @@ function html(m: Mail): string {
 </div></div></body></html>`;
 }
 
-async function send(to: string, m: Mail): Promise<void> {
+/** replyToTeam: only the team's own shop takes replies by email; other shops talk on the order page */
+async function send(to: string, m: Mail, replyToTeam: boolean): Promise<void> {
   const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: { Authorization: `Bearer ${RESEND}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      from: FROM, to: [to], reply_to: TEAM, subject: m.subject, html: html(m),
+      from: FROM, to: [to], ...(replyToTeam ? { reply_to: TEAM } : {}), subject: m.subject, html: html(m),
       text: [...m.lines, '', `${m.cta}: ${m.link}`].join('\n\n'),
     }),
   });
@@ -166,30 +201,40 @@ Deno.serve(async (req) => {
   if (!Number.isSafeInteger(orderId) || orderId <= 0) return reply(400, { error: 'order_id or message_id needed' });
 
   const { data: order, error: readErr } = await db.from('orders')
-    .select('id, code, title, product, quantity, total_thb, status, created_at, updated_at, slip_at, paid_at, shipped_at, tracking_carrier, tracking_no, lang, user_id')
+    .select('id, code, title, product, quantity, total_thb, status, created_at, updated_at, slip_at, paid_at, shipped_at, tracking_carrier, tracking_no, lang, user_id, shop_id, accepted_at, cancel_reason, cancelled_by')
     .eq('id', orderId).maybeSingle();
   if (readErr) return reply(500, { error: `read order: ${readErr.message}`, key: keyKind });
   if (!order) return reply(404, { error: 'no such order', key: keyKind });
   const o = order as Order;
+  let shop: Shop | null = null;
+  if (o.shop_id) {
+    const { data } = await db.from('shops').select('id, name, official, owner_id, lead_time').eq('id', o.shop_id).maybeSingle();
+    shop = (data as Shop | null) ?? null;
+  }
+  const official = !shop || shop.official;
 
+  const emailOf = async (uid: string | null) => (uid ? (await db.auth.admin.getUserById(uid)).data.user?.email ?? null : null);
   let customerEmail: string | null | undefined;
+  let shopEmail: string | null | undefined;
   const sent: string[] = [];
   const failed: string[] = [];
-  for (const m of dueMails(o, msg)) {
+  for (const m of dueMails(o, shop, msg)) {
     if (!m.at || Date.now() - Date.parse(m.at) > FRESH_MS) continue;
-    let to = TEAM;
+    let to: string | null;
     if (m.to === 'customer') {
-      if (customerEmail === undefined) {
-        customerEmail = o.user_id ? (await db.auth.admin.getUserById(o.user_id)).data.user?.email ?? null : null;
-      }
-      if (!customerEmail) continue;
+      if (customerEmail === undefined) customerEmail = await emailOf(o.user_id);
       to = customerEmail;
+    } else {
+      // the team's shop → the team inbox; any other shop → its owner
+      if (shopEmail === undefined) shopEmail = official ? TEAM : await emailOf(shop!.owner_id);
+      to = shopEmail;
     }
+    if (!to) continue;
     // claim it first: if the row is already there, this email has gone out (or is going out) already
     const { error: claim } = await db.from('order_alerts').insert({ order_id: o.id, key: m.key });
     if (claim) continue;
     try {
-      await send(to, m);
+      await send(to, m, official);
       sent.push(m.key);
     } catch (e) {
       console.error(o.code, m.key, (e as Error).message);

@@ -260,3 +260,17 @@
 .order-pricing-edit { margin-left: auto; font-size: 13px; font-weight: 600; color: var(--brand); padding: 4px 10px; border: 1px solid var(--line-2); border-radius: 8px; }
 .order-pricing[open] .order-pricing-edit { display: none; }
 .order-team-thread summary .status-chip { margin-left: 4px; }
+
+/* ---------- the shop page (pages/ShopPage.tsx) ---------- */
+.shop-main { max-width: 820px; display: flex; flex-direction: column; gap: 14px; }
+.shop-tabs a { flex: 1; padding: 13px 6px; text-align: center; font-size: 14px; color: var(--ink-2); text-decoration: none; box-shadow: inset 0 -2px 0 transparent; }
+.shop-tabs a.on { color: var(--ink); box-shadow: inset 0 -2px 0 var(--brand); font-weight: 600; }
+.shop-stages { margin-top: 0; }
+.shop-stages .chip { display: inline-flex; align-items: center; gap: 6px; }
+.shop-count { min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: var(--thread); color: #fff; font-size: 11px; line-height: 18px; text-align: center; }
+.shop-stages .chip.on .shop-count { background: #fff; color: var(--brand); }
+.shop-closed { margin: 0; padding: 8px 12px; border-radius: 10px; background: #fdf1d8; color: #7a5410; }
+.shop-settings { display: flex; flex-direction: column; gap: 12px; }
+.shop-settings h4 { margin: 6px 0 0; }
+.shop-handoff { margin-bottom: 14px; }
+.order-end { margin-top: 10px; padding: 10px 12px; border: 1px solid #e9c4c0; border-radius: 10px; background: #fdf6f5; display: flex; flex-direction: column; gap: 8px; }

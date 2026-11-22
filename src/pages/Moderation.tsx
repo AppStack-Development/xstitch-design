@@ -1,25 +1,15 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { StitchLoader } from '../components/StitchLoader';
 import { askConfirm } from '../components/ConfirmDialog';
 import type { Post } from '../lib/community';
 import { amModerator, decide, recentlyHandled, reviewQueue, DECISION_LABEL, REASON_LABEL, type Decision, type ReviewItem } from '../lib/moderation';
 import { useCloud } from '../lib/cloud';
 import { t, locale } from '../lib/i18n';
-import { modelOf, templateLabel } from '../lib/templates';
 import { Thumb } from '../components/Thumb';
 import { Icon } from '../components/Icon';
 import { LangSwitch } from '../components/LangSwitch';
 import { TeamBadge, usePostPattern } from '../components/PostCard';
-import type { Pattern } from '../types';
-import {
-  ORDER_STATUSES, PRODUCTS, SIZE_LIMITS, STATUS_LABEL as ORDER_STATUS, baht, cm, getTeamNote, listOrders, loadPricing, ordersEnabled,
-  pieceMm, productName, promptPayPayload, saveConfig, saveTeamNote, sizeOf, updateOrder, type Order, type OrderMessage, type OrderStatus,
-} from '../lib/orders';
-import { OrderThread } from '../components/OrderThread';
-import { SlipPeek } from './OrderPage';
-import { decodeShare, downloadBlob, safeFilename } from '../lib/share';
-import { buildPlate, toBinaryStl } from '../lib/plate';
-import { computeStats } from '../lib/stats';
+import { PRODUCTS, SIZE_LIMITS, loadPricing, ordersEnabled, saveConfig } from '../lib/orders';
 
 type Tab = 'open' | 'handled' | 'orders';
 
@@ -97,7 +87,7 @@ export function Moderation({ startTab }: { startTab?: Tab } = {}) {
           </div>
           <button className="btn sm ghost" onClick={() => setReload((n) => n + 1)}><Icon name="sync" size={15} /> {t('โหลดใหม่', 'Refresh')}</button>
         </div>
-        {tab === 'orders' ? <OrdersPanel reload={reload} /> : <>
+        {tab === 'orders' ? <OrdersPanel /> : <>
         {err && <p className="error">{err}</p>}
         {!err && items === null && <StitchLoader small label={t('กำลังโหลด…', 'Loading…')} />}
         {items && !items.length && (
@@ -222,42 +212,22 @@ function ReviewCard({ item, handled, onDecided }: { item: ReviewItem; handled: b
 
 // ---------- orders ----------
 
-const when2 = (iso: string) => new Date(iso).toLocaleString(locale, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
-/** Orders waiting on the team come first. */
-const URGENCY: Record<OrderStatus, number> = { payment_review: 0, paid: 1, in_production: 2, awaiting_payment: 3, shipped: 4, done: 5, cancelled: 6 };
-
-/** The team's list of orders: open ones first (most urgent on top), closed ones on demand. */
-function OrdersPanel({ reload }: { reload: number }) {
-  const [closed, setClosed] = useState(false);
-  const [items, setItems] = useState<Order[] | null>(null);
-  const [err, setErr] = useState('');
-  useEffect(() => {
-    let live = true;
-    setItems(null);
-    setErr('');
-    listOrders(!closed)
-      .then((x) => { if (live) setItems(closed ? x : [...x].sort((a, b) => URGENCY[a.status] - URGENCY[b.status])); })
-      .catch((e) => { if (live) setErr((e as Error).message); });
-    return () => { live = false; };
-  }, [closed, reload]);
+/** The team's side of orders: the team shop's prices here; the orders themselves on the shop page (#/shop). */
+function OrdersPanel() {
   return (
     <>
+      <div className="community-msg shop-handoff">
+        <p><b>{t('ออเดอร์ย้ายไปที่หน้าร้านแล้ว', 'Orders now live on the shop page')}</b></p>
+        <p className="muted">{t('ทุกออเดอร์เป็นของร้าน ร้านของทีมคือ XStitch.Design ทำออเดอร์ ตั้งค่าส่ง และพร้อมเพย์ได้ที่หน้าร้าน',
+          'Every order belongs to a shop; the team’s is XStitch.Design. Work its orders and set its shipping and PromptPay on the shop page.')}</p>
+        <a className="btn primary" href="#/shop"><Icon name="cube" size={16} /> {t('ไปที่ออเดอร์ของร้านทีม', 'Go to the team shop’s orders')}</a>
+      </div>
       <PricingEditor />
-      <label className="check orders-closed">
-        <input type="checkbox" checked={closed} onChange={(e) => setClosed(e.target.checked)} />
-        <span>{t('แสดงเฉพาะที่ปิดแล้ว (ได้รับแล้ว / ยกเลิก)', 'Show closed only (received / cancelled)')}</span>
-      </label>
-      {err && <p className="error">{err}</p>}
-      {!err && items === null && <StitchLoader small label={t('กำลังโหลด…', 'Loading…')} />}
-      {items && !items.length && (
-        <div className="community-msg"><p><b>{closed ? t('ยังไม่มีออเดอร์ที่ปิดแล้ว', 'No closed orders yet') : t('ไม่มีออเดอร์ที่รอดำเนินการ', 'No open orders')}</b></p></div>
-      )}
-      {items && items.length > 0 && <div className="review-list">{items.map((o) => <OrderCard key={o.id} order={o} />)}</div>}
     </>
   );
 }
 
-/** Prices per piece by size, shipping, and the PromptPay account customers pay into. */
+/** The team shop's prices per piece by size, and the per-stitch rate for fully stitched pieces. */
 function PricingEditor() {
   const [vals, setVals] = useState<Record<string, string> | null>(null);
   const [saved, setSaved] = useState<Record<string, string>>({});
@@ -267,10 +237,7 @@ function PricingEditor() {
     let live = true;
     loadPricing().then((p) => {
       if (!live) return;
-      const v: Record<string, string> = {
-        shipping: String(p.shipping), promptpay_id: p.promptpayId, promptpay_name: p.promptpayName,
-        stitch_rate: Number.isFinite(p.stitchRateSatang) ? (p.stitchRateSatang / 100).toFixed(2) : '',
-      };
+      const v: Record<string, string> = { stitch_rate: Number.isFinite(p.stitchRateSatang) ? (p.stitchRateSatang / 100).toFixed(2) : '' };
       for (const pr of PRODUCTS) for (const [s] of SIZE_LIMITS) v[`price:${pr.id}:${s}`] = String(p.prices[`${pr.id}:${s}`] ?? '');
       setVals(v);
       setSaved(v);
@@ -279,15 +246,13 @@ function PricingEditor() {
   }, []);
   if (!vals) return msg ? <p className="error small">{msg}</p> : null;
   const changed = Object.keys(vals).filter((k) => vals[k] !== saved[k]);
-  const badNumber = Object.keys(vals).some((k) => (k.startsWith('price:') || k === 'shipping') && !/^[0-9]{1,6}$/.test(vals[k].trim()));
+  const badNumber = Object.keys(vals).some((k) => k.startsWith('price:') && !/^[0-9]{1,6}$/.test(vals[k].trim()));
   const badRate = !/^[0-9]{1,2}(\.[0-9]{1,2})?$/.test(vals.stitch_rate.trim());
-  const ppDigits = vals.promptpay_id.replace(/[^0-9]/g, '');
-  const badPP = !!vals.promptpay_id.trim() && !promptPayPayload(vals.promptpay_id, 1);
   const save = async () => {
     setBusy(true);
     setMsg('');
     try {
-      await saveConfig(Object.fromEntries(changed.map((k) => [k, k === 'promptpay_id' ? ppDigits : vals[k]])));
+      await saveConfig(Object.fromEntries(changed.map((k) => [k, vals[k]])));
       setSaved({ ...vals });
       setMsg(t('บันทึกแล้ว ใช้กับออเดอร์ใหม่ตั้งแต่ตอนนี้', 'Saved; applies to new orders from now on.'));
     } catch (e) {
@@ -298,8 +263,8 @@ function PricingEditor() {
   };
   const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement>) => setVals({ ...vals, [k]: e.target.value });
   return (
-    <details className="order-pricing" open={!saved.promptpay_id || undefined}>
-      <summary><Icon name="edit" size={15} /> {t('ราคาและช่องทางชำระเงิน', 'Prices and payment')}{!saved.promptpay_id && <span className="status-chip hidden">{t('ยังไม่ตั้งพร้อมเพย์', 'PromptPay not set')}</span>}<span className="order-pricing-edit">{t('แก้ไข', 'Edit')}</span></summary>
+    <details className="order-pricing" open>
+      <summary><Icon name="edit" size={15} /> {t('ราคาของร้านทีม', 'The team shop’s prices')}<span className="order-pricing-edit">{t('แก้ไข', 'Edit')}</span></summary>
       <table className="order-price-table">
         <thead><tr><th>{t('บาท/ชิ้น', 'THB per piece')}</th>{SIZE_LIMITS.map(([s, mm]) => <th key={s}>{s} <small>≤{mm / 10} {t('ซม.', 'cm')}</small></th>)}</tr></thead>
         <tbody>
@@ -312,153 +277,17 @@ function PricingEditor() {
       </table>
       <div className="order-pay-fields">
         <label className="fb-field"><span>{t('ปักเสร็จ: ค่าปักต่อฝีเข็ม (บาท)', 'Fully stitched: per stitch (THB)')}</span><input inputMode="decimal" value={vals.stitch_rate} onChange={set('stitch_rate')} /></label>
-        <label className="fb-field"><span>{t('ค่าจัดส่ง (บาท/ออเดอร์)', 'Shipping (THB per order)')}</span><input inputMode="numeric" value={vals.shipping} onChange={set('shipping')} /></label>
-        <label className="fb-field"><span>{t('พร้อมเพย์ (เบอร์มือถือหรือเลขผู้เสียภาษี)', 'PromptPay (mobile or tax id)')}</span><input inputMode="numeric" value={vals.promptpay_id} onChange={set('promptpay_id')} autoComplete="off" /></label>
-        <label className="fb-field"><span>{t('ชื่อบัญชีที่ลูกค้าจะเห็น', 'Account name customers see')}</span><input value={vals.promptpay_name} maxLength={100} onChange={set('promptpay_name')} /></label>
       </div>
       <p className="hint">{t('ปักเสร็จคิดราคา = ราคาตั้งต้นตามขนาด + ค่าปักต่อฝีเข็ม × จำนวนฝีเข็มของลาย แล้วปัดขึ้นให้ลงท้ายด้วย 9 เช่น 159 + 0.30 × 214 = 223.2 → 229 บาท',
         'Fully stitched = the starting price for the size + the per-stitch rate × the pattern’s stitches, rounded up to end in 9, e.g. 159 + 0.30 × 214 = 223.2 → 229.')}</p>
-      <p className="hint">{t('ราคาใหม่ใช้กับออเดอร์ที่สั่งหลังบันทึก ออเดอร์เดิมคงราคาเดิม พร้อมเพย์จะเห็นได้เฉพาะผู้ใช้ที่เข้าสู่ระบบ',
-        'New prices apply to orders placed after saving; existing orders keep theirs. Only signed-in users can see the PromptPay details.')}</p>
+      <p className="hint">{t('ราคาใหม่ใช้กับออเดอร์ที่สั่งหลังบันทึก ออเดอร์เดิมคงราคาเดิม ค่าส่งและพร้อมเพย์อยู่ในหน้าตั้งค่าร้าน',
+        'New prices apply to orders placed after saving; existing orders keep theirs. Shipping and PromptPay are in the shop settings.')}</p>
       {badNumber && <p className="error small">{t('ราคาต้องเป็นตัวเลขเต็ม', 'Prices must be whole numbers')}</p>}
       {badRate && <p className="error small">{t('ค่าปักต่อฝีเข็มต้องเป็นตัวเลข ทศนิยมไม่เกิน 2 ตำแหน่ง เช่น 0.30', 'The per-stitch rate must be a number with up to 2 decimals, e.g. 0.30')}</p>}
-      {badPP && <p className="error small">{t('พร้อมเพย์ต้องเป็นเบอร์มือถือ 10 หลัก หรือเลข 13 หลัก', 'PromptPay must be a 10-digit mobile number or a 13-digit id')}</p>}
       <div className="btn-row">
-        <button className="btn primary sm" onClick={save} disabled={busy || !changed.length || badNumber || badRate || badPP}>{busy ? t('กำลังบันทึก…', 'Saving…') : t('บันทึกราคา', 'Save')}</button>
+        <button className="btn primary sm" onClick={save} disabled={busy || !changed.length || badNumber || badRate}>{busy ? t('กำลังบันทึก…', 'Saving…') : t('บันทึกราคา', 'Save')}</button>
         {msg && <span className="hint">{msg}</span>}
       </div>
     </details>
-  );
-}
-
-function OrderCard({ order }: { order: Order }) {
-  const [o, setO] = useState(order);
-  const [p, setP] = useState<Pattern | null>(null);
-  const [note, setNote] = useState('');
-  const [savedNote, setSavedNote] = useState('');
-  const [carrier, setCarrier] = useState(order.trackingCarrier);
-  const [tracking, setTracking] = useState(order.trackingNo);
-  // messages: count on the summary; opens by itself (once) when the customer wrote last and nobody has replied
-  const [threadOpen, setThreadOpen] = useState(false);
-  const [msgCount, setMsgCount] = useState(0);
-  const [awaitingReply, setAwaitingReply] = useState(false);
-  const autoOpened = useRef(false);
-  const onMessages = useCallback((list: OrderMessage[]) => {
-    const waiting = list.length > 0 && !list[list.length - 1].fromTeam;
-    setMsgCount(list.length);
-    setAwaitingReply(waiting);
-    if (waiting && !autoOpened.current) { autoOpened.current = true; setThreadOpen(true); }
-  }, []);
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState('');
-  useEffect(() => {
-    let live = true;
-    decodeShare(o.data).then((x) => { if (live) setP({ ...x, name: o.title }); }).catch(() => { /* no preview */ });
-    getTeamNote(o.id).then((n) => { if (live) { setNote(n); setSavedNote(n); } }).catch(() => { /* empty */ });
-    return () => { live = false; };
-  }, [o.id, o.data, o.title]);
-
-  const run = async (fn: () => Promise<void>) => {
-    setBusy(true);
-    setErr('');
-    try { await fn(); } catch (e) { setErr((e as Error).message); } finally { setBusy(false); }
-  };
-  const setStatus = (status: OrderStatus, extra: { trackingCarrier?: string; trackingNo?: string } = {}) => run(async () => {
-    await updateOrder(o.id, { status, ...extra });
-    setO({ ...o, status, trackingCarrier: extra.trackingCarrier ?? o.trackingCarrier, trackingNo: extra.trackingNo ?? o.trackingNo });
-  });
-  const stl = () => {
-    if (!p) return;
-    downloadBlob(toBinaryStl(buildPlate(p, p.details.thicknessMm, p.details.holeRatio), o.code), `${o.code}-${safeFilename(o.title)}.stl`);
-  };
-  // the size the customer paid for, checked against the pattern itself
-  const real = p ? sizeOf(p) : null;
-  // the stitch count the price was based on (fully stitched), checked the same way
-  const realStitches = p ? computeStats(p).total : null;
-  const { w, h } = p ? pieceMm(p) : pieceMm(o);
-
-  return (
-    <article className="review-card order-card">
-      <a className="review-thumb" href={`#/s/${o.data}`} title={t('เปิดลาย', 'Open pattern')}>
-        {p ? <Thumb pattern={p} max={96} view="stitch" /> : <span className="post-wait" aria-hidden="true" />}
-      </a>
-      <div className="review-main">
-        <div className="review-head">
-          <b className="order-code-sm">{o.code}</b>
-          <span className={`status-chip ${o.status === 'cancelled' ? 'removed' : o.status === 'done' ? 'published' : 'hidden'}`}>{ORDER_STATUS[o.status]()}</span>
-          <span className="review-when">{when2(o.createdAt)}</span>
-        </div>
-        <div className="post-by"><b>{o.title}</b> <span className="muted">· {templateLabel(o.templateName) ?? '3D'} · {cm(w)} × {cm(h)} {t('ซม.', 'cm')} · {t(`${o.colors} สี`, `${o.colors} ${o.colors === 1 ? 'color' : 'colors'}`)}</span></div>
-        {real && real !== o.size && <p className="error small">{t(`ขนาดในลายเป็น ${real} แต่ออเดอร์คิดราคาเป็น ${o.size}`, `The pattern is size ${real} but the order was priced as ${o.size}`)}</p>}
-        {realStitches !== null && realStitches !== o.stitches && <p className="error small">{t(`ลายนี้มี ${realStitches.toLocaleString()} ฝีเข็ม แต่ออเดอร์บันทึกไว้ ${o.stitches.toLocaleString()} ฝีเข็ม ตรวจราคาก่อนยืนยันรับเงิน`, `The pattern has ${realStitches.toLocaleString()} stitches but the order says ${o.stitches.toLocaleString()}; check the price before confirming payment`)}</p>}
-        <ul className="order-facts">
-          <li><span>{t('แบบ', 'Product')}</span><b>{productName(o.product)}</b></li>
-          <li><span>{t('สีพลาสติก', 'Plastic')}</span><b>{o.plasticColor || '–'}</b></li>
-          <li><span>{t('จำนวน', 'Qty')}</span><b>{o.quantity}</b></li>
-          <li><span>{t('ยอด', 'Total')}</span><b>{baht(o.total)}</b></li>
-        </ul>
-        <p className="order-addr small">{o.address.name} · {o.address.phone}<br />{o.address.address} {o.address.postcode}</p>
-        {o.note && <p className="review-note">{o.note}</p>}
-
-        <div className="order-next">
-          {o.status === 'awaiting_payment' && <p className="muted small">{t('รอลูกค้าโอนและแนบสลิป', 'Waiting for the customer to pay and attach a slip')}</p>}
-          {o.status === 'payment_review' && (
-            <>
-              <p className="small"><b>{t(`ตรวจสลิป: ต้องได้ ${baht(o.total)}`, `Check the slip: should be ${baht(o.total)}`)}</b></p>
-              <SlipPeek path={o.slipPath} />
-              <div className="review-actions">
-                <button className="btn primary sm" disabled={busy} onClick={() => setStatus('paid')}><Icon name="check" size={15} /> {t('ยืนยันรับเงิน', 'Confirm payment')}</button>
-                <button className="btn sm" disabled={busy} onClick={() => setStatus('awaiting_payment')}>{t('สลิปไม่ถูกต้อง ให้ส่งใหม่', 'Slip not right, ask again')}</button>
-              </div>
-              <p className="hint">{t('ถ้าสลิปไม่ถูกต้อง พิมพ์บอกเหตุผลลูกค้าในข้อความด้านล่างด้วย', 'If the slip is wrong, tell the customer why in the messages below.')}</p>
-            </>
-          )}
-          {o.status === 'paid' && (
-            <div className="review-actions">
-              <button className="btn primary sm" disabled={busy} onClick={() => setStatus('in_production')}>{t('เริ่มผลิต', 'Start making')}</button>
-            </div>
-          )}
-          {(o.status === 'in_production' || o.status === 'shipped') && (
-            <div className="order-ship">
-              <label className="fb-field"><span>{t('ขนส่ง', 'Carrier')}</span><input value={carrier} maxLength={40} onChange={(e) => setCarrier(e.target.value)} placeholder={t('เช่น ไปรษณีย์ไทย', 'e.g. Thailand Post')} /></label>
-              <label className="fb-field"><span>{t('เลขพัสดุ', 'Tracking no.')}</span><input value={tracking} maxLength={60} onChange={(e) => setTracking(e.target.value)} /></label>
-              <button className="btn primary sm" disabled={busy || !tracking.trim()}
-                onClick={() => setStatus('shipped', { trackingCarrier: carrier, trackingNo: tracking })}>
-                {o.status === 'shipped' ? t('แก้เลขพัสดุ', 'Update tracking') : t('แจ้งจัดส่งแล้ว', 'Mark shipped')}
-              </button>
-            </div>
-          )}
-        </div>
-
-        <div className="order-team">
-          <label className="fb-field">
-            <span>{t('เปลี่ยนสถานะเอง', 'Set status')}</span>
-            <select value={o.status} disabled={busy} onChange={(e) => setStatus(e.target.value as OrderStatus)}>
-              {ORDER_STATUSES.map((s) => <option key={s} value={s}>{ORDER_STATUS[s]()}</option>)}
-            </select>
-          </label>
-          <label className="fb-field order-team-note">
-            <span>{t('บันทึกของทีม (ลูกค้าไม่เห็น)', 'Team note (not shown to the customer)')}</span>
-            <textarea value={note} rows={2} maxLength={2000} onChange={(e) => setNote(e.target.value)} placeholder={t('เช่น พิมพ์บนเครื่อง 2 ใช้ PLA ครีม', 'e.g. printer 2, cream PLA')} />
-          </label>
-        </div>
-        <div className="review-actions">
-          <button className="btn sm" onClick={() => run(async () => { await saveTeamNote(o.id, note); setSavedNote(note); })} disabled={busy || note === savedNote}>{t('บันทึกโน้ต', 'Save note')}</button>
-          <a className="btn sm" href={`#/s/${o.data}`}><Icon name="edit" size={15} /> {t('เปิดลาย', 'Open pattern')}</a>
-          {p && modelOf(p.templateId)
-            ? <span className="hint">{t('กล่องปักลาย: พิมพ์จากไฟล์ต้นฉบับของทีม', 'Stitch box: print from the team’s original files')}</span>
-            : <button className="btn sm" onClick={stl} disabled={!p}><Icon name="cube" size={15} /> {t('ดาวน์โหลด STL', 'Download STL')}</button>}
-        </div>
-        {err && <p className="error small">{err}</p>}
-        <details className="order-team-thread" open={threadOpen} onToggle={(e) => setThreadOpen(e.currentTarget.open)}>
-          <summary>
-            <Icon name="chat" size={15} /> {t('ข้อความกับลูกค้า', 'Messages with the customer')}
-            {msgCount > 0 && <span className="muted"> ({msgCount})</span>}
-            {awaitingReply && <span className="status-chip hidden">{t('รอทีมตอบ', 'Needs a reply')}</span>}
-          </summary>
-          <OrderThread orderId={o.id} asTeam onMessages={onMessages} />
-        </details>
-      </div>
-    </article>
   );
 }

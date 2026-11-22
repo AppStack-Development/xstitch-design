@@ -4,9 +4,10 @@ import { askConfirm } from '../components/ConfirmDialog';
 import qrcode from 'qrcode-generator';
 import type { Pattern } from '../types';
 import {
-  SIZE_LABEL, STATUS_LABEL, baht, cancelOrder, cm, confirmReceived, getOrder, loadPricing, pieceMm, productName,
-  promptPayPayload, slipUrl, uploadSlip, type Order, type OrderStatus, type Pricing,
+  SIZE_LABEL, STATUS_LABEL, baht, cancelOrder, cm, confirmReceived, getOrder, pieceMm, productName,
+  promptPayPayload, slipUrl, uploadSlip, type Order, type OrderStatus,
 } from '../lib/orders';
+import { getShop, orderPayment, type Shop, type ShopPayment } from '../lib/shops';
 import { useCloud } from '../lib/cloud';
 import { decodeShare } from '../lib/share';
 import { trackStep } from '../lib/analytics';
@@ -21,14 +22,14 @@ const day = (iso: string) => new Date(iso).toLocaleString(locale, { day: 'numeri
 
 /** The steps a customer sees, and which one each status sits on. */
 const STEPS = [
-  () => t('สั่งแล้ว', 'Ordered'), () => t('ชำระเงิน', 'Payment'), () => t('ผลิต', 'Making'),
+  () => t('ร้านรับออเดอร์', 'Accepted'), () => t('ชำระเงิน', 'Payment'), () => t('ผลิต', 'Making'),
   () => t('จัดส่ง', 'Shipped'), () => t('ได้รับ', 'Received'),
 ];
 const STEP_OF: Record<OrderStatus, number> = {
-  awaiting_payment: 1, payment_review: 1, paid: 2, in_production: 2, shipped: 3, done: 5, cancelled: -1,
+  awaiting_accept: 0, awaiting_payment: 1, payment_review: 1, paid: 2, in_production: 2, shipped: 3, done: 5, cancelled: -1,
 };
 
-/** "#/order/<code>": one order, for the customer who placed it (the team works orders on #/moderation). */
+/** "#/order/<code>": one order, for the customer who placed it (the shop works it on #/shop). */
 export function OrderPage({ code }: { code: string }) {
   const cloud = useCloud();
   const [order, setOrder] = useState<Order | null | undefined>(undefined);
@@ -79,11 +80,14 @@ export function OrderPage({ code }: { code: string }) {
 
 function OrderView({ order: o, onChanged }: { order: Order; onChanged: () => void }) {
   const [p, setP] = useState<Pattern | null>(null);
+  const [shop, setShop] = useState<Shop | null>(null);
   useEffect(() => {
     let live = true;
     decodeShare(o.data).then((x) => { if (live) setP({ ...x, name: o.title }); }).catch(() => { /* no preview */ });
+    if (o.shopId) getShop(o.shopId).then((x) => { if (live) setShop(x); }).catch(() => { /* named "the shop" */ });
     return () => { live = false; };
-  }, [o.data, o.title]);
+  }, [o.data, o.title, o.shopId]);
+  const shopName = shop?.name ?? t('ร้าน', 'the shop');
   const step = STEP_OF[o.status];
   const { w, h } = pieceMm(o);
 
@@ -92,7 +96,7 @@ function OrderView({ order: o, onChanged }: { order: Order; onChanged: () => voi
       <section className="order-card-box order-status">
         <div className="order-status-head">
           <span className={'status-chip ' + (o.status === 'cancelled' ? 'removed' : o.status === 'done' ? 'published' : 'hidden')}>{STATUS_LABEL[o.status]()}</span>
-          <span className="muted small">{t('สั่งเมื่อ', 'Ordered')} {day(o.createdAt)}</span>
+          <span className="muted small">{t('สั่งเมื่อ', 'Ordered')} {day(o.createdAt)}{shop && <> · {t(`ร้าน ${shop.name}`, shop.name)}</>}</span>
         </div>
         {step >= 0 && (
           <ol className="order-steps" aria-label={t('ขั้นตอน', 'Progress')}>
@@ -103,7 +107,7 @@ function OrderView({ order: o, onChanged }: { order: Order; onChanged: () => voi
             ))}
           </ol>
         )}
-        <NextStep order={o} onChanged={onChanged} />
+        <NextStep order={o} shop={shop} onChanged={onChanged} />
       </section>
 
       <section className="order-card-box">
@@ -139,15 +143,16 @@ function OrderView({ order: o, onChanged }: { order: Order; onChanged: () => voi
       </section>
 
       <section className="order-card-box">
-        <h3><Icon name="chat" size={18} /> {t('คุยกับทีม', 'Talk to the team')}</h3>
-        <OrderThread orderId={o.id} asTeam={false} />
+        <h3><Icon name="chat" size={18} /> {t(`คุยกับร้าน ${shopName}`, `Talk to ${shopName}`)}</h3>
+        <OrderThread orderId={o.id} asTeam={false} shopName={shop?.name} />
       </section>
     </>
   );
 }
 
 /** What the customer does (or waits for) now. */
-function NextStep({ order: o, onChanged }: { order: Order; onChanged: () => void }) {
+function NextStep({ order: o, shop, onChanged }: { order: Order; shop: Shop | null; onChanged: () => void }) {
+  const name = shop ? t(`ร้าน ${shop.name}`, shop.name) : t('ร้าน', 'the shop');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const act = async (fn: () => Promise<void>, ask?: Parameters<typeof askConfirm>[0]) => {
@@ -157,41 +162,54 @@ function NextStep({ order: o, onChanged }: { order: Order; onChanged: () => void
     try { await fn(); onChanged(); } catch (e) { setErr((e as Error).message); } finally { setBusy(false); }
   };
 
+  const cancelButton = (
+    <div className="btn-row">
+      <button className="btn ghost sm" disabled={busy} onClick={() => act(() => cancelOrder(o.code), {
+        title: t('ยกเลิกออเดอร์นี้?', 'Cancel this order?'),
+        message: <p>{t(`${name} จะไม่ผลิตออเดอร์นี้ ถ้าอยากได้อีกต้องสั่งใหม่`, `${name} won’t make this order. To get it later, you’ll need to order again.`)}</p>,
+        ok: t('ยกเลิกออเดอร์', 'Cancel order'),
+        cancel: t('ไม่ยกเลิก', 'Keep order'),
+        tone: 'danger',
+        icon: 'close',
+      })}>{t('ยกเลิกออเดอร์', 'Cancel order')}</button>
+    </div>
+  );
+
   switch (o.status) {
+    case 'awaiting_accept':
+      return (
+        <>
+          <p><b>{t(`ส่งคำสั่งซื้อให้${name} แล้ว`, `Sent to ${name}`)}</b> {t('รอร้านตอบรับ ปกติภายใน 3 วัน ร้านรับแล้วจะเห็นช่องทางชำระเงินที่นี่ ยังไม่ต้องโอนเงินตอนนี้',
+            'Waiting for the shop to accept, usually within 3 days. Once it does, the payment details appear here. Don’t pay yet.')}</p>
+          {cancelButton}
+          {err && <p className="error small">{err}</p>}
+        </>
+      );
     case 'awaiting_payment':
       return (
         <>
-          <Payment order={o} onChanged={onChanged} />
-          <div className="btn-row">
-            <button className="btn ghost sm" disabled={busy} onClick={() => act(() => cancelOrder(o.code), {
-              title: t('ยกเลิกออเดอร์นี้?', 'Cancel this order?'),
-              message: <p>{t('ทีมจะไม่ผลิตออเดอร์นี้ ถ้าอยากได้อีกต้องสั่งใหม่', 'The team won’t make this order. To get it later, you’ll need to order again.')}</p>,
-              ok: t('ยกเลิกออเดอร์', 'Cancel order'),
-              cancel: t('ไม่ยกเลิก', 'Keep order'),
-              tone: 'danger',
-              icon: 'close',
-            })}>{t('ยกเลิกออเดอร์', 'Cancel order')}</button>
-          </div>
+          <Payment order={o} shopName={name} onChanged={onChanged} />
+          {cancelButton}
           {err && <p className="error small">{err}</p>}
         </>
       );
     case 'payment_review':
       return (
         <>
-          <p><b>{t('ได้รับสลิปแล้ว', 'We’ve got your slip')}</b> {t('ทีมกำลังตรวจยอด ปกติภายใน 1 วันทำการ ถ้าแนบผิด ส่งสลิปใหม่ได้', 'We’re checking the payment, usually within a working day. Sent the wrong one? Upload it again.')}</p>
+          <p><b>{t('ส่งสลิปแล้ว', 'Slip sent')}</b> {t(`${name} กำลังตรวจยอด ถ้าแนบผิด ส่งสลิปใหม่ได้`, `${name} is checking the payment. Sent the wrong one? Upload it again.`)}</p>
           <SlipPeek path={o.slipPath} />
-          <Payment order={o} onChanged={onChanged} again />
+          <Payment order={o} shopName={name} onChanged={onChanged} again />
         </>
       );
     case 'paid':
     case 'in_production':
-      return <p><b>{t('ชำระเงินเรียบร้อย', 'Payment received')}</b> {t('ทีมกำลังพิมพ์และเตรียมชิ้นงานของคุณ ปกติส่งภายใน 5–7 วันทำการ', 'We’re printing and preparing your piece; it usually ships within 5–7 working days.')}</p>;
+      return <p><b>{t('ชำระเงินเรียบร้อย', 'Payment received')}</b> {t(`${name} กำลังเตรียมชิ้นงานของคุณ`, `${name} is preparing your piece`)}{shop?.leadTime && t(` ปกติเสร็จภายใน ${shop.leadTime}`, `; it’s usually ready in ${shop.leadTime}`)}</p>;
     case 'shipped':
       return (
         <>
           <p><b>{t('จัดส่งแล้ว', 'On its way')}</b> {o.trackingCarrier || o.trackingNo
             ? <>{o.trackingCarrier} <span className="order-code-sm">{o.trackingNo}</span></>
-            : t('ทีมจะแจ้งเลขพัสดุในข้อความด้านล่าง', 'The team will post the tracking number below.')}</p>
+            : t(`${name} จะแจ้งเลขพัสดุในข้อความด้านล่าง`, `${name} will post the tracking number below.`)}</p>
           <div className="btn-row">
             <button className="btn primary" disabled={busy} onClick={() => act(() => confirmReceived(o.code))}><Icon name="check" size={16} /> {t('ได้รับของแล้ว', 'I’ve received it')}</button>
           </div>
@@ -199,24 +217,33 @@ function NextStep({ order: o, onChanged }: { order: Order; onChanged: () => void
         </>
       );
     case 'done':
-      return <p><b>{t('ขอบคุณที่สั่งกับเรา', 'Thank you for your order')}</b> {t('ถ้ามีปัญหากับชิ้นงาน บอกทีมได้ในข้อความด้านล่าง', 'If anything’s wrong with the piece, tell us below.')}</p>;
+      return <p><b>{t('ได้รับของแล้ว', 'Received')}</b> {t(`ถ้ามีปัญหากับชิ้นงาน บอก${name} ได้ในข้อความด้านล่าง`, `If anything’s wrong with the piece, tell ${name} below.`)}</p>;
     case 'cancelled':
-      return <p className="muted">{t('ออเดอร์นี้ถูกยกเลิกแล้ว', 'This order was cancelled.')}</p>;
+      return (
+        <p className="muted">
+          {o.cancelledBy === 'customer' ? t('คุณยกเลิกออเดอร์นี้แล้ว', 'You cancelled this order.')
+            : o.cancelledBy === 'shop' ? (o.acceptedAt ? t(`${name} ยกเลิกออเดอร์นี้`, `${name} cancelled this order`) : t(`${name} ไม่ได้รับออเดอร์นี้`, `${name} couldn’t take this order`))
+            : o.cancelledBy === 'system' ? t('ออเดอร์นี้ถูกยกเลิกอัตโนมัติเพราะไม่มีการตอบภายในเวลา', 'This order was cancelled automatically after no reply in time.')
+            : t('ออเดอร์นี้ถูกยกเลิกแล้ว', 'This order was cancelled.')}
+          {o.cancelReason && <> {t('เหตุผล', 'Reason')}: “{o.cancelReason}”</>}
+          {o.refundConfirmed && <> · {t('ร้านแจ้งว่าคืนเงินแล้ว', 'the shop says it has refunded you')}</>}
+        </p>
+      );
   }
 }
 
-/** PromptPay QR for the exact amount, and the slip upload. */
-function Payment({ order: o, onChanged, again }: { order: Order; onChanged: () => void; again?: boolean }) {
-  const [pricing, setPricing] = useState<Pricing | null>(null);
+/** The shop's PromptPay QR for the exact amount, and the slip upload. */
+function Payment({ order: o, shopName, onChanged, again }: { order: Order; shopName: string; onChanged: () => void; again?: boolean }) {
+  const [pay, setPay] = useState<ShopPayment | null | undefined>(undefined);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
     if (again) return;
     let live = true;
-    loadPricing().then((x) => { if (live) setPricing(x); }).catch(() => { /* shown as "not set up" */ });
+    orderPayment(o.code).then((x) => { if (live) setPay(x); }).catch(() => { if (live) setPay(null); });
     return () => { live = false; };
-  }, [again]);
+  }, [again, o.code]);
 
   const upload = async (file: File | undefined) => {
     if (!file) return;
@@ -243,20 +270,20 @@ function Payment({ order: o, onChanged, again }: { order: Order; onChanged: () =
   );
   if (again) return <div className="btn-row">{picker}{err && <p className="error small">{err}</p>}</div>;
 
-  const payload = pricing?.promptpayId ? promptPayPayload(pricing.promptpayId, o.total) : null;
+  const payload = pay?.promptpayId ? promptPayPayload(pay.promptpayId, o.total) : null;
   return (
     <div className="order-pay">
       <p><b>{t(`ชำระ ${baht(o.total)} ผ่านพร้อมเพย์`, `Pay ${baht(o.total)} by PromptPay`)}</b></p>
-      {pricing === null ? <p className="muted small">{t('กำลังโหลด…', 'Loading…')}</p> : payload ? (
+      {pay === undefined ? <p className="muted small">{t('กำลังโหลด…', 'Loading…')}</p> : payload ? (
         <div className="order-qr">
           <QrCanvas text={payload} />
           <p className="small">{t('สแกนด้วยแอปธนาคาร ยอดเงินจะขึ้นให้อัตโนมัติ', 'Scan with your banking app; the amount fills in by itself.')}
-            {pricing.promptpayName && <><br />{t('ชื่อบัญชี', 'Account name')}: <b>{pricing.promptpayName}</b></>}</p>
+            {pay?.promptpayName && <><br />{t('ชื่อบัญชี', 'Account name')}: <b>{pay.promptpayName}</b></>}</p>
         </div>
       ) : (
-        <p className="muted small">{t('ทีมยังไม่ได้ตั้งช่องทางชำระเงิน จะแจ้งในข้อความด้านล่างเร็วๆ นี้', 'Payment details aren’t set up yet; the team will post them below shortly.')}</p>
+        <p className="muted small">{t(`${shopName} ยังไม่ได้ตั้งช่องทางชำระเงิน ถามในข้อความด้านล่างได้`, `${shopName} hasn’t set up payment details yet; ask below.`)}</p>
       )}
-      <p className="small">{t('โอนแล้วแนบสลิปที่นี่ ทีมจะตรวจและเริ่มผลิตให้', 'After paying, attach the slip here and we’ll check it and start making your piece.')}</p>
+      <p className="small">{t(`เงินโอนเข้าบัญชีของ${shopName} โดยตรง โอนแล้วแนบสลิปที่นี่ ร้านจะตรวจและเริ่มผลิตให้`, `The money goes straight to ${shopName}. After paying, attach the slip here; the shop checks it and starts making your piece.`)}</p>
       <div className="btn-row">{picker}</div>
       {err && <p className="error small">{err}</p>}
     </div>

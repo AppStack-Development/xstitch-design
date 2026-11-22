@@ -5,10 +5,12 @@ import { computeStats } from './stats';
 import { lang, t } from './i18n';
 
 /**
- * Ordering a 3D piece, start to finish on the website: a signed-in customer picks options, sees the price,
- * gives a delivery address and places the order; pays by PromptPay QR and uploads the slip; the team checks it,
- * makes and ships the piece and adds the tracking number; the customer marks it received. Both sides talk in a
- * message thread on the order. Tables and permissions: supabase/migrations/0006_orders.sql.
+ * Ordering a piece, start to finish on the website: a signed-in customer picks options, sees the price,
+ * gives a delivery address and places the order with a shop; the shop accepts it (the team's shop does so by
+ * itself); the customer pays the shop by PromptPay QR and uploads the slip; the shop checks it, makes and ships
+ * the piece and adds the tracking number; the customer marks it received. Both sides talk in a message thread
+ * on the order. Tables and permissions: supabase/migrations/0006_orders.sql, 0012_shops.sql; the shop's side
+ * is in lib/shops.ts.
  */
 
 export const ordersEnabled = cloudEnabled;
@@ -18,7 +20,7 @@ export const ORDER_TERMS_VERSION = '2026-11-21';
 
 export type Product = 'blank' | 'kit' | 'stitched';
 export type Size = 'S' | 'M' | 'L';
-export type OrderStatus = 'awaiting_payment' | 'payment_review' | 'paid' | 'in_production' | 'shipped' | 'done' | 'cancelled';
+export type OrderStatus = 'awaiting_accept' | 'awaiting_payment' | 'payment_review' | 'paid' | 'in_production' | 'shipped' | 'done' | 'cancelled';
 
 export const PRODUCTS: { id: Product; name: () => string; desc: () => string }[] = [
   { id: 'kit', name: () => t('ชุดปักเอง', 'Stitch-it-yourself kit'), desc: () => t('ชิ้นงาน + ด้าย DMC ครบทุกสีตามลาย + เข็ม + การ์ดแผนผัง', 'The piece + every DMC thread in the pattern + needle + chart card') },
@@ -33,6 +35,7 @@ export const PLASTIC_COLORS = [
 ];
 
 export const STATUS_LABEL: Record<OrderStatus, () => string> = {
+  awaiting_accept: () => t('รอร้านตอบรับ', 'Waiting for the shop'),
   awaiting_payment: () => t('รอชำระเงิน', 'Awaiting payment'),
   payment_review: () => t('รอตรวจสลิป', 'Checking payment'),
   paid: () => t('ชำระแล้ว', 'Paid'),
@@ -83,23 +86,22 @@ export interface Pricing {
   prices: Record<string, number>;
   /** fully stitched: satang added per stitch (0.30 baht -> 30); kept whole so the sum matches the database exactly */
   stitchRateSatang: number;
+  /** the team shop's shipping fee per order */
   shipping: number;
-  /** only for signed-in users */
-  promptpayId: string;
-  promptpayName: string;
 }
 
+/** The team shop's prices (order_config, until shops get their own rate cards) and its shipping fee. */
 export async function loadPricing(): Promise<Pricing> {
   const c = await client();
-  const { data, error } = await c.from('order_config').select('key, value');
-  if (error) throw new Error(error.message);
-  const out: Pricing = { prices: {}, stitchRateSatang: NaN, shipping: NaN, promptpayId: '', promptpayName: '' };
-  for (const { key, value } of (data ?? []) as { key: string; value: string }[]) {
+  const [cfg, shop] = await Promise.all([
+    c.from('order_config').select('key, value'),
+    c.from('shops').select('shipping_thb').eq('official', true).maybeSingle(),
+  ]);
+  if (cfg.error) throw new Error(cfg.error.message);
+  const out: Pricing = { prices: {}, stitchRateSatang: NaN, shipping: Number(shop.data?.shipping_thb ?? NaN) };
+  for (const { key, value } of (cfg.data ?? []) as { key: string; value: string }[]) {
     if (key.startsWith('price:')) out.prices[key.slice(6)] = Number(value);
     else if (key === 'stitch_rate') out.stitchRateSatang = Math.round(Number(value) * 100);
-    else if (key === 'shipping') out.shipping = Number(value);
-    else if (key === 'promptpay_id') out.promptpayId = value;
-    else if (key === 'promptpay_name') out.promptpayName = value;
   }
   return out;
 }
@@ -156,14 +158,22 @@ function newCode(): string {
   return 'XSD-' + Array.from(rnd, (b) => abc[b % abc.length]).join('');
 }
 
-/** Turns the database's own error words into something a customer can act on. */
-function friendly(message: string): string {
+/** Turns the database's own error words into something a customer (or shop) can act on. */
+export function friendlyOrderError(message: string): string {
   if (/too many orders/.test(message)) return t('สั่งหลายครั้งแล้วในชั่วโมงนี้ ลองใหม่อีกสักครู่', 'You’ve placed several orders this hour. Try again later.');
   if (/too many messages/.test(message)) return t('ส่งข้อความหลายครั้งแล้วในชั่วโมงนี้ ลองใหม่อีกสักครู่', 'You’ve sent many messages this hour. Try again later.');
   if (/piece too large/.test(message)) return t('ชิ้นนี้ใหญ่เกินที่เราพิมพ์ได้', 'This piece is larger than we can print.');
   if (/no price set/.test(message)) return t('ยังไม่ได้ตั้งราคาสำหรับแบบนี้ ลองเลือกแบบอื่น', 'This option has no price yet. Try another one.');
   if (/terms not accepted/.test(message)) return t('ต้องยอมรับเงื่อนไขการสั่งซื้อก่อน', 'Please accept the order terms first.');
   if (/cannot be cancelled/.test(message)) return t('ยกเลิกได้เฉพาะออเดอร์ที่ยังไม่ได้ชำระเงิน', 'Only unpaid orders can be cancelled.');
+  if (/shop not taking orders/.test(message)) return t('ร้านนี้ปิดรับออเดอร์อยู่', 'This shop isn’t taking orders right now.');
+  if (/shop is busy/.test(message)) return t('ร้านนี้มีออเดอร์เต็มแล้ว ลองใหม่ภายหลัง', 'This shop is full for now. Try again later.');
+  if (/reason needed/.test(message)) return t('ใส่เหตุผลให้ลูกค้าทราบด้วย', 'Add a reason for the customer.');
+  if (/refund not confirmed/.test(message)) return t('ออเดอร์นี้ชำระแล้ว ต้องคืนเงินลูกค้าก่อนยกเลิก', 'This order is paid; refund the customer before cancelling.');
+  if (/tracking number needed/.test(message)) return t('ใส่เลขพัสดุก่อน', 'Enter the tracking number first.');
+  if (/order not found/.test(message)) return t('ไม่พบออเดอร์นี้ หรือคุณไม่ได้ดูแลร้านของออเดอร์นี้', 'Order not found, or it isn’t your shop’s.');
+  if (/not waiting for the shop|no slip to check|is not paid|not being made|is closed/.test(message))
+    return t('สถานะออเดอร์เปลี่ยนไปแล้ว รีเฟรชหน้าแล้วลองใหม่', 'The order has moved on; refresh and try again.');
   if (navigator.onLine === false) return t('ไม่มีอินเทอร์เน็ต ลองใหม่เมื่อออนไลน์', 'You’re offline. Try again when you’re online.');
   return message;
 }
@@ -191,7 +201,7 @@ export async function placeOrder(p: Pattern, o: OrderOptions): Promise<string> {
     const code = newCode();
     const { error } = await c.from('orders').insert({ ...row, code });
     if (!error) return code;
-    if (!/duplicate|unique/i.test(error.message)) throw new Error(friendly(error.message));
+    if (!/duplicate|unique/i.test(error.message)) throw new Error(friendlyOrderError(error.message));
   }
   throw new Error(t('สั่งไม่สำเร็จ ลองอีกครั้ง', 'Couldn’t place the order. Please try again.'));
 }
@@ -209,12 +219,14 @@ export interface Order {
   trackingCarrier: string; trackingNo: string; shippedAt: string | null; closedAt: string | null;
   /** version of the order terms agreed to when ordering */
   termsVersion: string;
+  shopId: number | null; acceptedAt: string | null;
+  cancelReason: string; cancelledBy: 'customer' | 'shop' | 'system' | null; refundConfirmed: boolean;
 }
 
-const ORDER_COLS = 'id, code, created_at, updated_at, user_id, title, template_name, cols, rows, pitch_mm, size, colors, stitches, data, product, plastic_color, quantity, note, ship_name, ship_phone, ship_address, ship_postcode, unit_thb, shipping_thb, total_thb, status, slip_path, slip_at, paid_at, tracking_carrier, tracking_no, shipped_at, closed_at, terms_version';
+export const ORDER_COLS = 'id, code, created_at, updated_at, user_id, title, template_name, cols, rows, pitch_mm, size, colors, stitches, data, product, plastic_color, quantity, note, ship_name, ship_phone, ship_address, ship_postcode, unit_thb, shipping_thb, total_thb, status, slip_path, slip_at, paid_at, tracking_carrier, tracking_no, shipped_at, closed_at, terms_version, shop_id, accepted_at, cancel_reason, cancelled_by, refund_confirmed';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function toOrder(r: any): Order {
+export function toOrder(r: any): Order {
   return {
     id: r.id, code: r.code, createdAt: r.created_at, updatedAt: r.updated_at, mine: r.user_id === getCloud().user?.id,
     title: r.title, templateName: r.template_name, cols: r.cols, rows: r.rows, pitchMm: Number(r.pitch_mm), size: r.size,
@@ -225,6 +237,8 @@ function toOrder(r: any): Order {
     status: r.status, slipPath: r.slip_path, slipAt: r.slip_at, paidAt: r.paid_at,
     trackingCarrier: r.tracking_carrier, trackingNo: r.tracking_no, shippedAt: r.shipped_at, closedAt: r.closed_at,
     termsVersion: r.terms_version ?? '',
+    shopId: r.shop_id ?? null, acceptedAt: r.accepted_at ?? null,
+    cancelReason: r.cancel_reason ?? '', cancelledBy: r.cancelled_by ?? null, refundConfirmed: !!r.refund_confirmed,
   };
 }
 
@@ -259,7 +273,7 @@ export async function myOrderData(): Promise<unknown[]> {
   }));
 }
 
-/** One order by code: yours, or any for the team. Null when not found or not yours. */
+/** One order by code: yours, or one placed with a shop you work. Null when not found or not yours. */
 export async function getOrder(code: string): Promise<Order | null> {
   const c = await client();
   const { data, error } = await c.from('orders').select(ORDER_COLS).eq('code', code).maybeSingle();
@@ -279,9 +293,9 @@ export async function uploadSlip(o: Order, file: File): Promise<void> {
   const ext = file.type === 'image/png' ? 'png' : file.type === 'image/webp' ? 'webp' : 'jpg';
   const path = `${uid}/${o.code}/${Date.now()}.${ext}`;
   const up = await c.storage.from('payment-slips').upload(path, file, { contentType: file.type, upsert: false });
-  if (up.error) throw new Error(friendly(up.error.message));
+  if (up.error) throw new Error(friendlyOrderError(up.error.message));
   const { error } = await c.rpc('order_submit_slip', { order_code: o.code, slip: path });
-  if (error) throw new Error(friendly(error.message));
+  if (error) throw new Error(friendlyOrderError(error.message));
 }
 
 /** A short-lived link to look at a slip (the files are private). */
@@ -295,13 +309,13 @@ export async function slipUrl(path: string): Promise<string> {
 export async function cancelOrder(code: string): Promise<void> {
   const c = await client();
   const { error } = await c.rpc('order_cancel', { order_code: code });
-  if (error) throw new Error(friendly(error.message));
+  if (error) throw new Error(friendlyOrderError(error.message));
 }
 
 export async function confirmReceived(code: string): Promise<void> {
   const c = await client();
   const { error } = await c.rpc('order_received', { order_code: code });
-  if (error) throw new Error(friendly(error.message));
+  if (error) throw new Error(friendlyOrderError(error.message));
 }
 
 // ---------- messages on an order ----------
@@ -319,7 +333,7 @@ export async function listMessages(orderId: number): Promise<OrderMessage[]> {
 export async function sendMessage(orderId: number, body: string): Promise<void> {
   const c = await client();
   const { error } = await c.from('order_messages').insert({ order_id: orderId, body: body.trim().slice(0, 1000) });
-  if (error) throw new Error(friendly(error.message));
+  if (error) throw new Error(friendlyOrderError(error.message));
 }
 
 // ---------- PromptPay QR (Thai QR payment, EMVCo) ----------
@@ -351,26 +365,7 @@ export function promptPayPayload(id: string, amount: number): string | null {
   return body + crc16(body);
 }
 
-// ---------- the team's side (moderators only; enforced by the database) ----------
-
-export async function listOrders(open: boolean): Promise<Order[]> {
-  const c = await client();
-  let q = c.from('orders').select(ORDER_COLS);
-  q = open ? q.not('status', 'in', '(done,cancelled)') : q.in('status', ['done', 'cancelled']);
-  const { data, error } = await q.order('created_at', { ascending: !open }).limit(200);
-  if (error) throw new Error(error.message);
-  return (data ?? []).map(toOrder);
-}
-
-export async function updateOrder(id: number, patch: { status?: OrderStatus; trackingCarrier?: string; trackingNo?: string }): Promise<void> {
-  const c = await client();
-  const row: Record<string, string> = {};
-  if (patch.status) row.status = patch.status;
-  if (patch.trackingCarrier !== undefined) row.tracking_carrier = patch.trackingCarrier.trim().slice(0, 40);
-  if (patch.trackingNo !== undefined) row.tracking_no = patch.trackingNo.trim().slice(0, 60);
-  const { error } = await c.from('orders').update(row).eq('id', id);
-  if (error) throw new Error(error.message);
-}
+// ---------- the shop's private notes (lib/shops.ts has the rest of the shop's side) ----------
 
 export async function getTeamNote(orderId: number): Promise<string> {
   const c = await client();
@@ -384,7 +379,7 @@ export async function saveTeamNote(orderId: number, note: string): Promise<void>
   if (error) throw new Error(error.message);
 }
 
-/** Save prices and payment details: { 'price:kit:M': '229', shipping: '50', promptpay_id: '…' }. */
+/** Save the team shop's prices: { 'price:kit:M': '229', stitch_rate: '0.30' } (moderators only). */
 export async function saveConfig(entries: Record<string, string>): Promise<void> {
   const c = await client();
   const rows = Object.entries(entries).map(([key, value]) => ({ key, value: value.trim() }));

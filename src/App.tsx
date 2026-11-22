@@ -31,6 +31,7 @@ const Terms = lazy(() => import('./pages/Terms').then((m) => ({ default: m.Terms
 const Moderation = lazy(() => import('./pages/Moderation').then((m) => ({ default: m.Moderation })));
 const OrderPage = lazy(() => import('./pages/OrderPage').then((m) => ({ default: m.OrderPage })));
 const OrderTerms = lazy(() => import('./pages/OrderTerms').then((m) => ({ default: m.OrderTerms })));
+const ShopPage = lazy(() => import('./pages/ShopPage').then((m) => ({ default: m.ShopPage })));
 
 const LIKELY_NEXT = [() => import('./pages/Editor'), () => import('./pages/StitchMode'), () => import('./pages/QuickCreate')];
 function prefetchLikelyPages() {
@@ -106,6 +107,7 @@ function Routes() {
   if (route === 'community') return <Community key={arg ?? ''} tag={arg} />;
   if (route === 'moderation') return <Moderation key={arg ?? ''} startTab={arg === 'orders' ? 'orders' : undefined} />;
   if (route === 'order' && arg) return <OrderPage key={arg} code={arg} />;
+  if (route === 'shop') return <ShopPage key={arg ?? ''} view={arg === 'settings' ? 'settings' : 'orders'} />;
   if (route === 'c' && arg) return <CommunityPost key={arg} id={arg} />;
   if (route === 'new') return <NewPattern key={arg} mode={arg === 'template' ? 'template' : 'free'} />;
   if (route === 'edit' && arg) return <Editor key={arg} id={arg} />;

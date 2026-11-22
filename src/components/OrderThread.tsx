@@ -10,11 +10,14 @@ const when = (iso: string) => new Date(iso).toLocaleString(locale, { day: 'numer
  * Messages between the customer and the team on one order. `asTeam` flips whose messages sit on the right.
  * Reloads when the tab comes back into view, so a reply shows up without a refresh.
  */
-export function OrderThread({ orderId, asTeam, onMessages }: {
+export function OrderThread({ orderId, asTeam, shopName, onMessages }: {
   orderId: number; asTeam: boolean;
+  /** the shop the order went to; its messages carry this name (the team's shop by default) */
+  shopName?: string;
   /** called with the messages every time they (re)load, e.g. so the team card can show a count */
   onMessages?: (items: OrderMessage[]) => void;
 }) {
+  const shop = shopName ? t(`ร้าน ${shopName}`, shopName) : t(`ทีม ${APP_NAME}`, `the ${APP_NAME} team`);
   const [items, setItemsState] = useState<OrderMessage[] | null>(null);
   const report = useRef(onMessages);
   report.current = onMessages;
@@ -56,7 +59,7 @@ export function OrderThread({ orderId, asTeam, onMessages }: {
       {items && items.length === 0 && (
         <p className="muted small">{asTeam
           ? t('ยังไม่มีข้อความ', 'No messages yet')
-          : t('มีคำถามเรื่องออเดอร์นี้? พิมพ์ถึงทีมได้ที่นี่ ทีมตอบในวันทำการ', 'Questions about this order? Write to the team here; we reply on working days.')}</p>
+          : t(`มีคำถามเรื่องออเดอร์นี้? พิมพ์ถึง${shop} ได้ที่นี่`, `Questions about this order? Write to ${shop} here.`)}</p>
       )}
       {items && items.length > 0 && (
         <ol className="order-msgs">
@@ -64,7 +67,7 @@ export function OrderThread({ orderId, asTeam, onMessages }: {
             const own = m.fromTeam === asTeam;
             return (
               <li key={m.id} className={own ? 'own' : ''}>
-                <span className="order-msg-who">{m.fromTeam ? t(`ทีม ${APP_NAME}`, `${APP_NAME} team`) : asTeam ? t('ลูกค้า', 'Customer') : t('คุณ', 'You')} · {when(m.createdAt)}</span>
+                <span className="order-msg-who">{m.fromTeam ? shop : asTeam ? t('ลูกค้า', 'Customer') : t('คุณ', 'You')} · {when(m.createdAt)}</span>
                 <p>{m.body}</p>
               </li>
             );
@@ -74,8 +77,8 @@ export function OrderThread({ orderId, asTeam, onMessages }: {
       <div ref={endRef} />
       <div className="order-reply">
         <textarea value={text} rows={2} maxLength={1000} onChange={(e) => setText(e.target.value)}
-          aria-label={asTeam ? t('ตอบลูกค้า', 'Reply to the customer') : t('ข้อความถึงทีม', 'Message to the team')}
-          placeholder={asTeam ? t('ตอบลูกค้า…', 'Reply to the customer…') : t('พิมพ์ถึงทีม…', 'Write to the team…')}
+          aria-label={asTeam ? t('ตอบลูกค้า', 'Reply to the customer') : t(`ข้อความถึง${shop}`, `Message to ${shop}`)}
+          placeholder={asTeam ? t('ตอบลูกค้า…', 'Reply to the customer…') : t(`พิมพ์ถึง${shop}…`, `Write to ${shop}…`)}
           onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) send(); }} />
         <button className="btn primary" onClick={send} disabled={busy || !text.trim()}>
           <Icon name="send" size={16} /> {busy ? t('กำลังส่ง…', 'Sending…') : t('ส่ง', 'Send')}

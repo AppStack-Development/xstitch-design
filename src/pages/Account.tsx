@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { StitchLoader } from '../components/StitchLoader';
 import { askConfirm } from '../components/ConfirmDialog';
-import { useCloud, signInWithGoogle } from '../lib/cloud';
+import { useCloud, signInWithGoogle, getCloud } from '../lib/cloud';
 import { syncNow, signOutAndClear, exportMyData, deleteMyAccount, accountCounts } from '../lib/sync';
 import { downloadBlob } from '../lib/share';
 import { t, locale } from '../lib/i18n';
@@ -18,6 +18,7 @@ import { useStash } from '../lib/stash';
 import { DMC_LIBRARY } from '../lib/threads';
 import { STATUS_LABEL as ORDER_STATUS, baht, isClosed, myOrders, ordersEnabled, type Order } from '../lib/orders';
 import { APP_SLUG } from '../lib/brand';
+import { shopsIWork, type Shop } from '../lib/shops';
 
 const errText = (e: unknown) => (e as Error)?.message || t('เกิดข้อผิดพลาด ลองอีกครั้ง', 'Something went wrong. Please try again.');
 
@@ -320,7 +321,31 @@ function ModeratorCard() {
       </p>
       <div className="btn-row">
         <a className={'btn' + (count ? ' primary' : '')} href="#/moderation"><Icon name="flag" size={16} /> {t('ตรวจการแจ้งปัญหา', 'Review reports')}{count ? ` (${count})` : ''}</a>
-        <a className="btn" href="#/moderation/orders"><Icon name="cube" size={16} /> {t('ออเดอร์และราคา', 'Orders and prices')}</a>
+        <a className="btn" href="#/shop"><Icon name="cube" size={16} /> {t('ออเดอร์ร้านทีม', 'Team shop orders')}</a>
+        <a className="btn" href="#/moderation/orders">{t('ราคาร้านทีม', 'Team shop prices')}</a>
+      </div>
+    </section>
+  );
+}
+
+/** Your own shop, if you have one (the team shop is reached from the team card). */
+function MyShopCard() {
+  const [shop, setShop] = useState<Shop | null>(null);
+  useEffect(() => {
+    let live = true;
+    const uid = getCloud().user?.id;
+    shopsIWork().then((list) => { if (live) setShop(list.find((x) => x.ownerId === uid) ?? null); }).catch(() => { /* no card */ });
+    return () => { live = false; };
+  }, []);
+  if (!shop) return null;
+  return (
+    <section className="acct-card">
+      <h3><Icon name="cube" size={18} /> {t('ร้านของฉัน', 'My shop')}: {shop.name}</h3>
+      <p className="muted">{shop.suspended ? t('ร้านถูกระงับโดยทีม', 'Suspended by the team')
+        : shop.accepting ? t('เปิดรับออเดอร์อยู่', 'Taking orders') : t('ปิดรับออเดอร์ชั่วคราว', 'Closed for now')}</p>
+      <div className="btn-row">
+        <a className="btn primary" href="#/shop"><Icon name="cube" size={16} /> {t('ออเดอร์ของร้าน', 'Shop orders')}</a>
+        <a className="btn" href="#/shop/settings">{t('ตั้งค่าร้าน', 'Shop settings')}</a>
       </div>
     </section>
   );
@@ -501,6 +526,7 @@ function SignedIn() {
       </section>
 
       {communityEnabled && <ModeratorCard />}
+      {ordersEnabled && <MyShopCard />}
       {communityEnabled && <MyShared />}
 
       <section className="acct-card">
