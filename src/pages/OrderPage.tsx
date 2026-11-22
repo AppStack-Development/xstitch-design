@@ -4,7 +4,7 @@ import { askConfirm } from '../components/ConfirmDialog';
 import qrcode from 'qrcode-generator';
 import type { Pattern } from '../types';
 import {
-  STATUS_LABEL, baht, cancelOrder, productMaterial, sizeLabel, cm, confirmReceived, getOrder, pieceMm, productName,
+  STATUS_LABEL, acceptQuote, baht, cancelOrder, productMaterial, sizeLabel, cm, confirmReceived, getOrder, pieceMm, productName,
   promptPayPayload, slipUrl, uploadSlip, type Order, type OrderStatus,
 } from '../lib/orders';
 import { getShop, orderPayment, orderReview, type Review, type Shop, type ShopPayment } from '../lib/shops';
@@ -28,7 +28,7 @@ const STEPS = [
   () => t('จัดส่ง', 'Shipped'), () => t('ได้รับ', 'Received'),
 ];
 const STEP_OF: Record<OrderStatus, number> = {
-  awaiting_accept: 0, awaiting_payment: 1, payment_review: 1, paid: 2, in_production: 2, shipped: 3, done: 5, cancelled: -1,
+  quote_requested: 0, quoted: 0, awaiting_accept: 0, awaiting_payment: 1, payment_review: 1, paid: 2, in_production: 2, shipped: 3, done: 5, cancelled: -1,
 };
 
 /** "#/order/<code>": one order, for the customer who placed it (the shop works it on #/shop). */
@@ -105,7 +105,7 @@ function OrderView({ order: o, onChanged }: { order: Order; onChanged: () => voi
           <ol className="order-steps" aria-label={t('ขั้นตอน', 'Progress')}>
             {STEPS.map((s, i) => (
               <li key={i} className={i < step ? 'done' : i === step ? 'now' : ''} aria-current={i === step ? 'step' : undefined}>
-                <i>{i < step ? <Icon name="check" size={14} /> : i + 1}</i><span>{s()}</span>
+                <i>{i < step ? <Icon name="check" size={14} /> : i + 1}</i><span>{i === 0 && o.isQuote ? t('ตกลงราคา', 'Price agreed') : s()}</span>
               </li>
             ))}
           </ol>
@@ -137,11 +137,16 @@ function OrderView({ order: o, onChanged }: { order: Order; onChanged: () => voi
             </ul>
           </div>
         </div>
+        {o.status === 'quote_requested' || (o.isQuote && o.status === 'cancelled' && !o.quotedAt) ? (
+          <p className="order-next">{t(`ขอใบเสนอราคา · ${o.quantity} ชิ้น ร้านจะบอกราคาต่อชิ้นและค่าส่ง`, `Quote request · ${o.quantity} piece${o.quantity === 1 ? '' : 's'}. The shop names the price per piece and shipping.`)}</p>
+        ) : <>
         <dl className="order-sum">
           <div><dt>{t(`ชิ้นงาน ${baht(o.unit)} × ${o.quantity}`, `Piece ${baht(o.unit)} × ${o.quantity}`)}</dt><dd>{baht(o.unit * o.quantity)}</dd></div>
           <div><dt>{t('ค่าจัดส่ง', 'Shipping')}</dt><dd>{baht(o.shipping)}</dd></div>
           <div className="order-total"><dt>{t('รวม', 'Total')}</dt><dd>{baht(o.total)}</dd></div>
         </dl>
+        {o.isQuote && o.quoteNote && <p className="review-note"><b>{t('ร้านแจ้งว่า', 'The shop says')}:</b> {o.quoteNote}</p>}
+        </>}
         <h4>{t('จัดส่งถึง', 'Deliver to')}</h4>
         <p className="order-addr">{o.address.name}{'\u00a0· '}{o.address.phone}<br />{o.address.address} {o.address.postcode}</p>
         {o.note && <><h4>{t('ข้อความตอนสั่ง', 'Your note')}</h4><p className="review-note">{o.note}</p></>}
@@ -206,6 +211,42 @@ function NextStep({ order: o, shop, onChanged }: { order: Order; shop: Shop | nu
   );
 
   switch (o.status) {
+    case 'quote_requested':
+      return (
+        <>
+          <p><b>{t(`ส่งคำขอราคาให้${name} แล้ว`, `Asked ${name} for a price`)}</b> {t('ร้านจะเสนอราคาภายใน 3 วัน (ถ้าไม่ตอบ คำขอจะถูกยกเลิกอัตโนมัติ) คุยรายละเอียดกับร้านได้ด้านล่าง ยังไม่ต้องโอนเงิน',
+            'The shop has 3 days to quote (otherwise the request is cancelled automatically). Talk details over below. Don’t pay anything yet.')}</p>
+          <div className="btn-row">
+            <button className="btn ghost sm" disabled={busy} onClick={() => act(() => cancelOrder(o.code), {
+              title: t('ยกเลิกคำขอราคานี้?', 'Withdraw this quote request?'),
+              message: <p>{t(`${name} จะไม่เสนอราคาหรือผลิตงานนี้`, `${name} won’t quote or make this.`)}</p>,
+              ok: t('ยกเลิกคำขอ', 'Withdraw'), cancel: t('ไม่ยกเลิก', 'Keep it'), tone: 'danger', icon: 'close',
+            })}>{t('ยกเลิกคำขอ', 'Withdraw request')}</button>
+          </div>
+          {err && <p className="error small">{err}</p>}
+        </>
+      );
+    case 'quoted':
+      return (
+        <>
+          <p><b>{t(`${name} เสนอราคา ${baht(o.total)}`, `${name} quotes ${baht(o.total)}`)}</b> {t(`(${baht(o.unit)} × ${o.quantity} + ค่าส่ง ${baht(o.shipping)})`, `(${baht(o.unit)} × ${o.quantity} + ${baht(o.shipping)} shipping)`)}</p>
+          {o.quoteNote && <p className="review-note">{o.quoteNote}</p>}
+          <p className="hint">{t('ยอมรับราคาแล้วจะเห็นช่องทางชำระเงิน และมีเวลาโอน 2 วัน ตอบภายใน 3 วันหลังร้านเสนอราคา ไม่อย่างนั้นคำขอจะถูกยกเลิกอัตโนมัติ',
+            'Accept to see where to pay; you then have 2 days to pay. Answer within 3 days of the quote, or the request is cancelled automatically.')}</p>
+          <div className="btn-row">
+            <button className="btn primary" disabled={busy} onClick={() => act(async () => {
+              // a revised price fails here: reload so the new one shows, and say so
+              try { await acceptQuote(o.code, o.total); } catch (e) { onChanged(); throw e; }
+            })}><Icon name="check" size={16} /> {t(`ยอมรับราคา · ${baht(o.total)}`, `Accept · ${baht(o.total)}`)}</button>
+            <button className="btn ghost sm" disabled={busy} onClick={() => act(() => cancelOrder(o.code), {
+              title: t('ไม่รับราคานี้?', 'Turn this quote down?'),
+              message: <p>{t('คำขอนี้จะถูกยกเลิก ถ้าอยากต่อรอง คุยกับร้านในข้อความด้านล่างก่อนได้', 'The request is cancelled. To haggle, talk to the shop below first.')}</p>,
+              ok: t('ไม่รับราคา', 'Turn down'), cancel: t('กลับไปดู', 'Go back'), tone: 'danger', icon: 'close',
+            })}>{t('ไม่รับราคานี้', 'Turn it down')}</button>
+          </div>
+          {err && <p className="error small">{err}</p>}
+        </>
+      );
     case 'awaiting_accept':
       return (
         <>

@@ -4,7 +4,7 @@ import {
   ORDER_STATUSES, STATUS_LABEL, baht, cm, getTeamNote, pieceMm, productMaterial, productName, saveTeamNote, sizeOf,
   type Order, type OrderMessage, type OrderStatus,
 } from '../lib/orders';
-import { orderReview, shopAction, type Review, type Shop, type ShopAction } from '../lib/shops';
+import { orderReview, sendQuote, shopAction, type Review, type Shop, type ShopAction } from '../lib/shops';
 import { ReviewItem } from './ShopTrust';
 import { decodeShare, downloadBlob, safeFilename } from '../lib/share';
 import { buildPlate, toBinaryStl } from '../lib/plate';
@@ -104,13 +104,18 @@ export function ShopOrderCard({ order, shop, onChanged }: { order: Order; shop: 
           <li><span>{t('แบบ', 'Product')}</span><b>{productName(o.product)}</b></li>
           {productMaterial(o.product) === '3d' && <li><span>{t('สีพลาสติก', 'Plastic')}</span><b>{o.plasticColor || '–'}</b></li>}
           <li><span>{t('จำนวน', 'Qty')}</span><b>{o.quantity}</b></li>
-          <li><span>{t('ยอด', 'Total')}</span><b>{baht(o.total)}</b></li>
+          <li><span>{t('ยอด', 'Total')}</span><b>{o.isQuote && !o.quotedAt ? (open ? t('รอร้านเสนอราคา', 'to be quoted') : '–') : baht(o.total)}</b></li>
+          {o.isQuote && <li><span>{t('ฝีเข็ม', 'Stitches')}</span><b>{o.stitches.toLocaleString()}</b></li>}
         </ul>
         <p className="order-addr small">{o.address.name} · {o.address.phone}<br />{o.address.address} {o.address.postcode}</p>
         {o.postId && <p className="small"><a className="acct-link" href={`#/c/${o.postId}`}>{t('ลายจากชุมชน: เปิดดูลายต้นฉบับ', 'From a community pattern: see the original')}</a></p>}
         {o.note && <p className="review-note">{o.note}</p>}
 
         <div className="order-next">
+          {(o.status === 'quote_requested' || o.status === 'quoted') && !ending && (
+            <QuoteForm order={o} shop={shop} busy={busy} onSend={(unit, ship, text) => run(() => sendQuote(o.code, unit, ship, text))}
+              onDecline={() => { setEnding('decline'); setReason(''); }} />
+          )}
           {o.status === 'awaiting_accept' && !ending && (
             <>
               <p className="small"><b>{t('ลูกค้ารอให้ร้านตอบรับ', 'The customer is waiting for your answer')}</b> {t('รับแล้วลูกค้าจะเห็นพร้อมเพย์ของร้านและโอนได้', 'Once accepted, they see your PromptPay and can pay.')}</p>
@@ -204,7 +209,7 @@ export function ShopOrderCard({ order, shop, onChanged }: { order: Order; shop: 
           {material === 'fabric' ? null : p && modelOf(p.templateId)
             ? <span className="hint">{t('กล่องปักลาย: พิมพ์จากไฟล์ต้นฉบับของทีม', 'Stitch box: print from the team’s original files')}</span>
             : <button className="btn sm" onClick={stl} disabled={!p}><Icon name="cube" size={15} /> {t('ดาวน์โหลด STL', 'Download STL')}</button>}
-          {open && o.status !== 'awaiting_accept' && !ending && (
+          {open && o.status !== 'awaiting_accept' && o.status !== 'quote_requested' && !ending && (
             <button className="btn ghost sm" disabled={busy} onClick={() => { setEnding('cancel'); setReason(''); setRefunded(false); }}>{t('ยกเลิกออเดอร์', 'Cancel order')}</button>
           )}
         </div>
@@ -221,5 +226,54 @@ export function ShopOrderCard({ order, shop, onChanged }: { order: Order; shop: 
         </details>
       </div>
     </article>
+  );
+}
+
+/** The shop names its price for a quote request (or revises it while the customer hasn't answered). */
+function QuoteForm({ order: o, shop, busy, onSend, onDecline }: {
+  order: Order; shop: Shop; busy: boolean; onSend: (unit: number, shipping: number, note: string) => void; onDecline: () => void;
+}) {
+  const quoted = o.status === 'quoted';
+  const [unit, setUnit] = useState(quoted ? String(o.unit) : '');
+  const [ship, setShip] = useState(String(quoted ? o.shipping : shop.shippingThb));
+  const [text, setText] = useState(o.quoteNote);
+  const [editing, setEditing] = useState(!quoted);
+  const u = Number(unit);
+  const sh = Number(ship);
+  const problem = !unit.trim() ? null
+    : !Number.isInteger(u) || u < 1 || u > 100000 ? t('ราคาต่อชิ้น 1–100,000 บาท', 'The price per piece is 1–100,000 THB')
+    : !Number.isInteger(sh) || sh < 0 || sh > 10000 ? t('ค่าส่ง 0–10,000 บาท', 'Shipping is 0–10,000 THB') : null;
+  const total = unit.trim() && !problem ? u * o.quantity + sh : null;
+  if (!editing) {
+    return (
+      <>
+        <p className="small"><b>{t(`เสนอราคาแล้ว ${baht(o.total)}`, `Quoted ${baht(o.total)}`)}</b> {t(`(${baht(o.unit)} × ${o.quantity} + ค่าส่ง ${baht(o.shipping)}) รอลูกค้าตอบรับภายใน 3 วัน`, `(${baht(o.unit)} × ${o.quantity} + ${baht(o.shipping)} shipping), waiting for the customer (3 days)`)}</p>
+        {o.quoteNote && <p className="review-note">{o.quoteNote}</p>}
+        <div className="review-actions"><button className="btn sm" disabled={busy} onClick={() => setEditing(true)}>{t('แก้ราคา', 'Change the quote')}</button></div>
+      </>
+    );
+  }
+  return (
+    <>
+      <p className="small"><b>{quoted ? t('แก้ราคาที่เสนอ', 'Change your quote') : t('ลูกค้าขอใบเสนอราคา', 'The customer asks for a price')}</b> {t('ตอบภายใน 3 วัน ถามรายละเอียดเพิ่มได้ในข้อความด้านล่าง', 'Answer within 3 days; ask anything in the messages below.')}</p>
+      <div className="order-pay-fields">
+        <label className="fb-field"><span>{t('ราคาต่อชิ้น (บาท)', 'Price per piece (THB)')}</span>
+          <input inputMode="numeric" value={unit} onChange={(e) => setUnit(e.target.value.replace(/[^0-9]/g, ''))} /></label>
+        <label className="fb-field"><span>{t('ค่าส่ง (บาท)', 'Shipping (THB)')}</span>
+          <input inputMode="numeric" value={ship} onChange={(e) => setShip(e.target.value.replace(/[^0-9]/g, ''))} /></label>
+      </div>
+      <label className="fb-field"><span>{t('รายละเอียดที่ลูกค้าเห็น (ไม่บังคับ)', 'What the customer sees (optional)')}</span>
+        <textarea value={text} rows={2} maxLength={500} onChange={(e) => setText(e.target.value)}
+          placeholder={t('เช่น ผ้าลินิน 28 count ใส่กรอบไม้ ผลิต 3 สัปดาห์', 'e.g. 28-count linen, wooden frame, ready in 3 weeks')} /></label>
+      {problem && <p className="error small">{problem}</p>}
+      <div className="review-actions">
+        <button className="btn primary sm" disabled={busy || total === null} onClick={() => { onSend(u, sh, text); }}>
+          <Icon name="check" size={15} /> {total !== null ? t(`เสนอราคา · ${baht(total)}`, `Send quote · ${baht(total)}`) : t('เสนอราคา', 'Send quote')}
+        </button>
+        {quoted
+          ? <button className="btn sm" disabled={busy} onClick={() => setEditing(false)}>{t('ไม่แก้', 'Keep it')}</button>
+          : <button className="btn sm" disabled={busy} onClick={onDecline}>{t('ปฏิเสธ', 'Decline')}</button>}
+      </div>
+    </>
   );
 }

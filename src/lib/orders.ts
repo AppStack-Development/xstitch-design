@@ -17,14 +17,17 @@ export const ordersEnabled = cloudEnabled;
 
 /** Version of the order terms (pages/OrderTerms.tsx) a new order agrees to; stored on every order.
  *  2026-11-22: orders go to shops, which receive the delivery details (required by shops other than the team's).
- *  2026-11-22b: automatic cancellation (3 days unanswered, 2 days unpaid), reviews and reporting a shop. */
-export const ORDER_TERMS_VERSION = '2026-11-22b';
+ *  2026-11-22b: automatic cancellation (3 days unanswered, 2 days unpaid), reviews and reporting a shop.
+ *  2026-11-22c: asking a shop for a price (quotes). */
+export const ORDER_TERMS_VERSION = '2026-11-22c';
 
 /** 3D-printed pieces and pieces on fabric are made, sized and priced differently. */
 export type Material = '3d' | 'fabric';
 export type Product = 'blank' | 'kit' | 'stitched' | 'fabric_kit' | 'fabric_stitched' | 'fabric_framed';
 export type Size = 'S' | 'M' | 'L';
-export type OrderStatus = 'awaiting_accept' | 'awaiting_payment' | 'payment_review' | 'paid' | 'in_production' | 'shipped' | 'done' | 'cancelled';
+/** An order's size: XL is larger than the size table, made only on a quote. */
+export type OrderSize = Size | 'XL';
+export type OrderStatus = 'quote_requested' | 'quoted' | 'awaiting_accept' | 'awaiting_payment' | 'payment_review' | 'paid' | 'in_production' | 'shipped' | 'done' | 'cancelled';
 
 export const PRODUCTS: { id: Product; material: Material; name: () => string; desc: () => string; perStitch?: true }[] = [
   { id: 'kit', material: '3d', name: () => t('ชุดปักเอง', 'Stitch-it-yourself kit'), desc: () => t('ชิ้นงาน + ด้ายครบทุกสีตามลาย + เข็ม + การ์ดแผนผัง', 'The piece + every thread in the pattern + needle + chart card') },
@@ -43,6 +46,8 @@ export const PLASTIC_COLORS = [
 ];
 
 export const STATUS_LABEL: Record<OrderStatus, () => string> = {
+  quote_requested: () => t('รอร้านเสนอราคา', 'Waiting for a quote'),
+  quoted: () => t('ร้านเสนอราคาแล้ว', 'Quote received'),
   awaiting_accept: () => t('รอร้านตอบรับ', 'Waiting for the shop'),
   awaiting_payment: () => t('รอชำระเงิน', 'Awaiting payment'),
   payment_review: () => t('รอตรวจสลิป', 'Checking payment'),
@@ -70,7 +75,8 @@ export const SIZE_LIMITS: Record<Material, [Size, number][]> = {
   fabric: [['S', 100], ['M', 200], ['L', 300]],
 };
 export const SIZES: Size[] = ['S', 'M', 'L'];
-export const sizeLabel = (m: Material, s: Size) => {
+export const sizeLabel = (m: Material, s: OrderSize) => {
+  if (s === 'XL') return t(`ใหญ่พิเศษ (เกิน ${SIZE_LIMITS[m][2][1] / 10} ซม. ตามใบเสนอราคา)`, `Extra large (over ${SIZE_LIMITS[m][2][1] / 10} cm, quoted)`);
   const max = SIZE_LIMITS[m].find(([x]) => x === s)![1] / 10;
   return s === 'S' ? t(`เล็ก (ไม่เกิน ${max} ซม.)`, `Small (up to ${max} cm)`)
     : s === 'M' ? t(`กลาง (ไม่เกิน ${max} ซม.)`, `Medium (up to ${max} cm)`)
@@ -99,6 +105,18 @@ export function cannotOrder(p: Pattern): string | null {
       ? t(`ชิ้นนี้ใหญ่ ${cm(w)} × ${cm(h)} ซม. เกินที่พิมพ์ได้ (ด้านยาวสุดไม่เกิน ${max} ซม.)`, `This piece is ${cm(w)} × ${cm(h)} cm, larger than can be printed (${max} cm on the longest side).`)
       : t(`ลายนี้ใหญ่ ${cm(w)} × ${cm(h)} ซม. เกินที่รับผลิต (ด้านยาวสุดไม่เกิน ${max} ซม.)`, `This design is ${cm(w)} × ${cm(h)} cm, larger than shops take (${max} cm on the longest side).`);
   }
+  return null;
+}
+
+/** Quote requests take pieces up to this long on the longest side (mm). Keep in step with 0016_quotes.sql. */
+export const QUOTE_MAX_MM = 1000;
+
+/** Why this pattern can't even be quoted, or null when shops can be asked for a price. */
+export function cannotQuote(p: Pattern): string | null {
+  const m = materialOf(p);
+  if (!m || computeStats(p).total === 0) return cannotOrder(p);
+  const { w, h } = pieceMm(p);
+  if (Math.max(w, h) > QUOTE_MAX_MM + 1e-6) return t(`ลายนี้ใหญ่ ${cm(w)} × ${cm(h)} ซม. เกินที่ร้านรับ (ด้านยาวสุดไม่เกิน 1 เมตร)`, `This design is ${cm(w)} × ${cm(h)} cm, larger than shops take (1 m on the longest side).`);
   return null;
 }
 
@@ -161,6 +179,11 @@ export function friendlyOrderError(message: string): string {
   if (/rights not confirmed/.test(message)) return t('ยืนยันก่อนว่าคุณมีสิทธิ์ให้ผลิตลายนี้', 'Confirm you may have this design made first.');
   if (/set up PromptPay first/.test(message)) return t('ตั้งพร้อมเพย์ในตั้งค่าร้านก่อนรับออเดอร์', 'Set up PromptPay in the shop settings before accepting orders.');
   if (/cannot be cancelled/.test(message)) return t('ยกเลิกได้เฉพาะออเดอร์ที่ยังไม่ได้ชำระเงิน', 'Only unpaid orders can be cancelled.');
+  if (/shop not taking quotes/.test(message)) return t('ร้านนี้ไม่รับขอราคาสำหรับงานแบบนี้', 'This shop doesn’t take quote requests for this kind of piece.');
+  if (/price changed/.test(message)) return t('ร้านเพิ่งแก้ราคา ดูราคาใหม่แล้วกดยอมรับอีกครั้ง', 'The shop has just changed the price. Check the new price and accept again.');
+  if (/no quote to accept|not a quote request/.test(message)) return t('สถานะออเดอร์เปลี่ยนไปแล้ว รีเฟรชหน้าแล้วลองใหม่', 'The order has moved on; refresh and try again.');
+  if (/price 1 to 100000/.test(message)) return t('ราคาต่อชิ้น 1–100,000 บาท', 'The price per piece is 1–100,000 THB');
+  if (/shipping 0 to 10000/.test(message)) return t('ค่าส่ง 0–10,000 บาท', 'Shipping is 0–10,000 THB');
   if (/shop not taking orders/.test(message)) return t('ร้านนี้ปิดรับออเดอร์อยู่', 'This shop isn’t taking orders right now.');
   if (/shop is busy/.test(message)) return t('ร้านนี้มีออเดอร์เต็มแล้ว ลองใหม่ภายหลัง', 'This shop is full for now. Try again later.');
   if (/reason needed/.test(message)) return t('ใส่เหตุผลให้ลูกค้าทราบด้วย', 'Add a reason for the customer.');
@@ -179,6 +202,8 @@ export interface OrderOptions {
   rightsConfirmed: boolean;
   /** the community post this design comes from (its own, or a copy of it), if any */
   postId?: string | null;
+  /** ask the shop for a price instead of ordering at a listed one */
+  quote?: boolean;
 }
 
 /** Place an order; returns its code. Size and price are worked out again by the database. */
@@ -196,6 +221,7 @@ export async function placeOrder(p: Pattern, o: OrderOptions): Promise<string> {
     ship_name: o.address.name.trim().slice(0, 100), ship_phone: o.address.phone.trim(),
     ship_address: o.address.address.trim().slice(0, 500), ship_postcode: o.address.postcode.trim(),
     terms_version: ORDER_TERMS_VERSION, shop_id: o.shopId, rights_confirmed: o.rightsConfirmed, post_id: o.postId ?? null,
+    is_quote: !!o.quote,
   };
   // a clash of two random codes is very unlikely; try once more if it happens
   for (let attempt = 0; attempt < 2; attempt++) {
@@ -211,7 +237,7 @@ export async function placeOrder(p: Pattern, o: OrderOptions): Promise<string> {
 
 export interface Order {
   id: number; code: string; createdAt: string; updatedAt: string; mine: boolean;
-  title: string; templateName: string | null; cols: number; rows: number; pitchMm: number; size: Size;
+  title: string; templateName: string | null; cols: number; rows: number; pitchMm: number; size: OrderSize;
   colors: number; stitches: number; data: string;
   product: Product; plasticColor: string; quantity: number; note: string;
   address: Address;
@@ -223,10 +249,12 @@ export interface Order {
   shopId: number | null; acceptedAt: string | null;
   cancelReason: string; cancelledBy: 'customer' | 'shop' | 'system' | null; refundConfirmed: boolean;
   postId: string | null;
+  /** started as a quote request; quotedAt and quoteNote are the shop's latest quote */
+  isQuote: boolean; quotedAt: string | null; quoteNote: string;
 }
 
 // the delivery address isn't a readable column (0013): it comes from orderAddresses()
-export const ORDER_COLS = 'id, code, created_at, updated_at, user_id, title, template_name, cols, rows, pitch_mm, size, colors, stitches, data, product, plastic_color, quantity, note, unit_thb, shipping_thb, total_thb, status, slip_path, slip_at, paid_at, tracking_carrier, tracking_no, shipped_at, closed_at, terms_version, shop_id, accepted_at, cancel_reason, cancelled_by, refund_confirmed, post_id';
+export const ORDER_COLS = 'id, code, created_at, updated_at, user_id, title, template_name, cols, rows, pitch_mm, size, colors, stitches, data, product, plastic_color, quantity, note, unit_thb, shipping_thb, total_thb, status, slip_path, slip_at, paid_at, tracking_carrier, tracking_no, shipped_at, closed_at, terms_version, shop_id, accepted_at, cancel_reason, cancelled_by, refund_confirmed, post_id, is_quote, quoted_at, quote_note';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function toOrder(r: any): Order {
@@ -243,6 +271,7 @@ export function toOrder(r: any): Order {
     shopId: r.shop_id ?? null, acceptedAt: r.accepted_at ?? null,
     cancelReason: r.cancel_reason ?? '', cancelledBy: r.cancelled_by ?? null, refundConfirmed: !!r.refund_confirmed,
     postId: r.post_id ?? null,
+    isQuote: !!r.is_quote, quotedAt: r.quoted_at ?? null, quoteNote: r.quote_note ?? '',
   };
 }
 
@@ -318,6 +347,13 @@ export async function slipUrl(path: string): Promise<string> {
 export async function cancelOrder(code: string): Promise<void> {
   const c = await client();
   const { error } = await c.rpc('order_cancel', { order_code: code });
+  if (error) throw new Error(friendlyOrderError(error.message));
+}
+
+/** Accept the shop's quote at the total you were shown (fails if the shop has changed it since). */
+export async function acceptQuote(code: string, total: number): Promise<void> {
+  const c = await client();
+  const { error } = await c.rpc('order_accept_quote', { order_code: code, p_total: total });
   if (error) throw new Error(friendlyOrderError(error.message));
 }
 

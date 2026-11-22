@@ -9,7 +9,7 @@ import {
 } from './orders';
 
 /** Version of the seller terms (pages/SellerTerms.tsx) a shop accepts when it opens; stored on the shop. */
-export const SELLER_TERMS_VERSION = '2026-11-22b';
+export const SELLER_TERMS_VERSION = '2026-11-22c';
 
 /**
  * Shops (docs/marketplace.md). Every order belongs to a shop, which accepts it, checks the slip, makes and ships it.
@@ -24,15 +24,17 @@ export interface Shop {
   stitchRate: number;
   /** what the shop's kits include */
   kitNote: string;
+  /** what it takes quote requests for (0016) */
+  quoteMaterials: Material[];
 }
 
-const SHOP_COLS = 'id, owner_id, name, about, accepting, lead_time, shipping_thb, official, suspended, created_at, stitch_rate, kit_note';
+const SHOP_COLS = 'id, owner_id, name, about, accepting, lead_time, shipping_thb, official, suspended, created_at, stitch_rate, kit_note, quote_materials';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const toShop = (r: any): Shop => ({
   id: r.id, ownerId: r.owner_id, name: r.name, about: r.about, accepting: r.accepting, leadTime: r.lead_time,
   shippingThb: r.shipping_thb, official: r.official, suspended: r.suspended, createdAt: r.created_at,
-  stitchRate: Number(r.stitch_rate ?? 0), kitNote: r.kit_note ?? '',
+  stitchRate: Number(r.stitch_rate ?? 0), kitNote: r.kit_note ?? '', quoteMaterials: r.quote_materials ?? [],
 });
 
 export async function getShop(id: number): Promise<Shop | null> {
@@ -64,6 +66,7 @@ export async function shopsIWork(): Promise<Shop[]> {
 
 export interface ShopEdit {
   name: string; about: string; accepting: boolean; leadTime: string; shippingThb: number; stitchRate: number; kitNote: string;
+  quoteMaterials: Material[];
 }
 
 export function shopProblem(s: ShopEdit): string | null {
@@ -79,6 +82,7 @@ export async function saveShop(id: number, s: ShopEdit): Promise<void> {
     name: s.name.trim().slice(0, 60), about: s.about.trim().slice(0, 500), accepting: s.accepting,
     lead_time: s.leadTime.trim().slice(0, 30), shipping_thb: s.shippingThb,
     stitch_rate: s.stitchRate, kit_note: s.kitNote.trim().slice(0, 300),
+    quote_materials: (['3d', 'fabric'] as Material[]).filter((m) => s.quoteMaterials.includes(m)),
   }).eq('id', id);
   if (error) throw new Error(error.message);
 }
@@ -190,6 +194,21 @@ export async function postQuotes(postId: string): Promise<ShopOffer[]> {
   return toOffers(data);
 }
 
+/** Shops taking orders that can be asked for a price on this material (no prices: they quote). */
+export async function quoteShops(material: Material): Promise<ShopOffer[]> {
+  const c = await client();
+  const { data, error } = await c.rpc('quote_shops', { p_material: material });
+  if (error) throw new Error(error.message);
+  return toOffers(data);
+}
+
+/** The shop quotes a price per piece, shipping and a note (or revises its quote before the customer answers). */
+export async function sendQuote(code: string, unit: number, shipping: number, note: string): Promise<void> {
+  const c = await client();
+  const { error } = await c.rpc('shop_quote', { order_code: code, p_unit: unit, p_shipping: shipping, p_note: note.trim().slice(0, 500) });
+  if (error) throw new Error(friendlyOrderError(error.message));
+}
+
 /** Every shop taking orders that makes this pattern at its size, priced by the database. */
 export async function shopQuotes(p: Pattern): Promise<{ material: Material | null; offers: ShopOffer[] }> {
   const material = materialOf(p);
@@ -233,12 +252,13 @@ export async function orderPayment(code: string): Promise<ShopPayment | null> {
 // ---------- the shop's orders ----------
 
 /** Where an order sits for the shop: what it has to do next. */
-export type Stage = 'accept' | 'payment' | 'slip' | 'make' | 'shipped' | 'closed';
+export type Stage = 'quote' | 'accept' | 'payment' | 'slip' | 'make' | 'shipped' | 'closed';
 export const STAGE_OF: Record<OrderStatus, Stage> = {
-  awaiting_accept: 'accept', awaiting_payment: 'payment', payment_review: 'slip',
+  quote_requested: 'quote', quoted: 'quote', awaiting_accept: 'accept', awaiting_payment: 'payment', payment_review: 'slip',
   paid: 'make', in_production: 'make', shipped: 'shipped', done: 'closed', cancelled: 'closed',
 };
 export const STAGES: { id: Stage; label: () => string }[] = [
+  { id: 'quote', label: () => t('ขอราคา', 'Quotes') },
   { id: 'accept', label: () => t('รอรับงาน', 'To accept') },
   { id: 'slip', label: () => t('ตรวจสลิป', 'Check slip') },
   { id: 'make', label: () => t('ต้องผลิต', 'To make') },

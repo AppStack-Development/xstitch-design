@@ -285,7 +285,7 @@ function OrdersCard() {
         {shown.map((o) => (
           <li key={o.code}>
             <a href={`#/order/${o.code}`}>
-              <span className="acct-order-main"><b>{o.title}</b><span className="muted small">{o.code} · {baht(o.total)}</span></span>
+              <span className="acct-order-main"><b>{o.title}</b><span className="muted small">{o.code} · {o.isQuote && !o.quotedAt ? t('ขอใบเสนอราคา', 'quote request') : baht(o.total)}</span></span>
               <span className={'status-chip ' + (o.status === 'cancelled' ? 'removed' : o.status === 'done' ? 'published' : 'hidden')}>{ORDER_STATUS[o.status]()}</span>
             </a>
           </li>

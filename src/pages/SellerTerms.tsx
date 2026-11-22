@@ -49,7 +49,9 @@ export function SellerTerms() {
               <li>{t('ราคาที่ร้านตั้งในเว็บ รวมค่าส่ง คือยอดที่ลูกค้าจ่าย ห้ามเรียกเก็บเพิ่มนอกยอดในออเดอร์ หรือขอให้โอนช่องทางอื่น', 'The prices you set on the site, shipping included, are what the customer pays. Don’t charge anything beyond the order’s total or ask for payment another way.')}</li>
               <li>{t('ตอบรับหรือปฏิเสธออเดอร์ภายใน 3 วัน ถ้าปฏิเสธ ให้บอกเหตุผล ออเดอร์ที่ไม่ตอบภายใน 3 วันจะถูกยกเลิกอัตโนมัติ ปิดรับชั่วคราวได้ในตั้งค่าร้านเมื่อคิวเต็มหรือไม่อยู่', 'Accept or decline each order within 3 days, giving a reason if you decline; unanswered orders are cancelled automatically after 3 days. Close your shop for a while in the settings when you’re full or away.')}</li>
               <li>{t('ลูกค้ามีเวลาโอน 2 วันหลังร้านรับออเดอร์ (หรือหลังร้านแจ้งว่าสลิปไม่ถูกต้อง) ถ้าไม่โอน ออเดอร์จะถูกยกเลิกอัตโนมัติ', 'Customers have 2 days to pay after you accept (or after you turn a slip down); unpaid orders are then cancelled automatically.')}</li>
-              <li>{t('ร้านใหม่มีออเดอร์ที่ยังไม่ปิดได้ครั้งละ 3 ออเดอร์ จนส่งสำเร็จครบ 3 ออเดอร์แรก', 'A new shop holds up to 3 open orders at a time until it has delivered 3.')}</li>
+              <li>{t('ถ้าเปิดรับขอใบเสนอราคา เสนอราคาหรือปฏิเสธภายใน 3 วัน (ไม่อย่างนั้นคำขอจะถูกยกเลิกอัตโนมัติ) ราคาที่เสนอรวมทุกอย่างแล้ว แก้ได้จนกว่าลูกค้าจะยอมรับ หลังลูกค้ายอมรับ ราคานั้นคือยอดของออเดอร์',
+                'If you take quote requests, quote or decline within 3 days (otherwise the request is cancelled automatically). A quote covers everything; you can revise it until the customer accepts, and once accepted it is the order’s total.')}</li>
+              <li>{t('ร้านใหม่มีออเดอร์ที่ยังไม่ปิด (รวมคำขอราคา) ได้ครั้งละ 3 ออเดอร์ จนส่งสำเร็จครบ 3 ออเดอร์แรก', 'A new shop holds up to 3 open orders (quote requests included) at a time until it has delivered 3.')}</li>
             </ul>
           </Sec>
 

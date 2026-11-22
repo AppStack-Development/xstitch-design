@@ -107,7 +107,7 @@ function ShopOrders({ shop }: { shop: Shop }) {
   }, [orders]);
   if (err) return <p className="error">{err}</p>;
   if (!orders) return <StitchLoader small label={t('กำลังโหลด…', 'Loading…')} />;
-  const current = stage ?? (['accept', 'slip', 'make'] as Stage[]).find((s) => counts[s] > 0) ?? 'payment';
+  const current = stage ?? (['quote', 'accept', 'slip', 'make'] as Stage[]).find((s) => counts[s] > 0) ?? 'payment';
   const list = orders.filter((o) => STAGE_OF[o.status] === current);
   return (
     <>
@@ -128,8 +128,10 @@ function ShopOrders({ shop }: { shop: Shop }) {
 function ShopSettings({ shop, onSaved }: { shop: Shop; onSaved: () => void }) {
   const [v, setV] = useState<ShopEdit>({
     name: shop.name, about: shop.about, accepting: shop.accepting, leadTime: shop.leadTime, shippingThb: shop.shippingThb,
-    stitchRate: shop.stitchRate, kitNote: shop.kitNote,
+    stitchRate: shop.stitchRate, kitNote: shop.kitNote, quoteMaterials: shop.quoteMaterials,
   });
+  const toggleQuote = (m: Material, on: boolean) =>
+    setV({ ...v, quoteMaterials: on ? [...v.quoteMaterials.filter((x) => x !== m), m] : v.quoteMaterials.filter((x) => x !== m) });
   const [rateText, setRateText] = useState<Record<string, string> | null>(null);
   const [rateStr, setRateStr] = useState(shop.stitchRate ? shop.stitchRate.toFixed(2) : '0');
   const [pay, setPay] = useState<ShopPayment | null>(null);
@@ -190,6 +192,16 @@ function ShopSettings({ shop, onSaved }: { shop: Shop; onSaved: () => void }) {
       </div>
       <p className="hint">{t('งานปักเสร็จคิดราคา = ราคาตั้งต้นตามขนาด + ค่าปักต่อฝีเข็ม × จำนวนฝีเข็มของลาย แล้วปัดขึ้นให้ลงท้ายด้วย 9 เช่น 159 + 0.30 × 214 = 223.2 → 229 บาท',
         'Stitched pieces = the price for the size + the per-stitch rate × the pattern’s stitches, rounded up to end in 9, e.g. 159 + 0.30 × 214 = 223.2 → 229.')}</p>
+
+      <h4>{t('รับขอใบเสนอราคา', 'Quote requests')}</h4>
+      <p className="hint">{t('ลูกค้าขอราคาได้สำหรับงานที่ไม่มีในตารางราคา เช่น ลายใหญ่กว่าขนาด L (สูงสุด 1 เมตร) หรือสินค้าที่ร้านไม่ได้ตั้งราคาไว้ ร้านมี 3 วันเสนอราคาหรือปฏิเสธ',
+        'Customers can ask for a price on what your table doesn’t list, like designs larger than L (up to 1 m) or products you haven’t priced. You have 3 days to quote or decline.')}</p>
+      <div className="shop-quote-pick">
+        {(['3d', 'fabric'] as Material[]).map((m) => (
+          <label key={m} className="check"><input type="checkbox" checked={v.quoteMaterials.includes(m)} onChange={(e) => toggleQuote(m, e.target.checked)} />
+            <span>{m === '3d' ? t('ชิ้นงานพิมพ์ 3D', '3D-printed pieces') : t('ลายบนผ้า', 'On fabric')}</span></label>
+        ))}
+      </div>
 
       <label className="check"><input type="checkbox" checked={v.accepting} onChange={(e) => setV({ ...v, accepting: e.target.checked })} />
         <span>{t('เปิดรับออเดอร์', 'Taking orders')} <small>{t('ปิดไว้ถ้าคิวเต็มหรือไม่อยู่ ออเดอร์ที่ค้างอยู่ยังทำต่อได้', 'Turn off when you’re full or away; open orders carry on.')}</small></span></label>

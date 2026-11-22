@@ -41,6 +41,8 @@ interface Order {
   created_at: string; updated_at: string; slip_at: string | null; paid_at: string | null; shipped_at: string | null;
   tracking_carrier: string; tracking_no: string; lang: Lang | null; user_id: string | null;
   shop_id: number | null; accepted_at: string | null; cancel_reason: string; cancelled_by: string | null;
+  // quote requests (migration 0016)
+  is_quote: boolean; quoted_at: string | null; quote_note: string; unit_thb: number; shipping_thb: number;
 }
 interface Shop { id: number; name: string; official: boolean; owner_id: string; lead_time: string }
 interface Message { id: number; order_id: number; created_at: string; from_team: boolean; body: string }
@@ -78,22 +80,53 @@ function dueMails(o: Order, shop: Shop | null, msg: Message | null): Mail[] {
     out.push({ key: `${key}:customer`, to: 'customer', at, subject, lines, link: orderLink, cta: tr('เปิดหน้าออเดอร์', 'Open your order') });
   const waitingForShop = !o.accepted_at && (o.status === 'awaiting_accept' || o.cancelled_by === 'shop');
 
-  // placed
-  toShop('new', o.created_at, `ออเดอร์ใหม่ ${o.code} · ${baht(o.total_thb, 'th')}`,
-    [what, waitingForShop ? `ยอด ${baht(o.total_thb, 'th')} · รอร้านกดรับหรือปฏิเสธในหน้าร้าน` : `ยอด ${baht(o.total_thb, 'th')} · รอลูกค้าชำระและแนบสลิป`]);
-  customer('new', o.created_at, tr(`ได้รับออเดอร์ ${o.code} แล้ว`, `We've got your order ${o.code}`), waitingForShop ? [
-    tr(`ส่งคำสั่งซื้อ “${o.title}” ให้${byShop} แล้ว`, `Your order for “${o.title}” has gone to ${byShop}.`),
-    tr('รอร้านตอบรับภายใน 3 วัน (ถ้าไม่ตอบ ออเดอร์จะถูกยกเลิกอัตโนมัติ) ร้านรับแล้วจะมีอีเมลแจ้ง และเห็นช่องทางชำระเงินในหน้าออเดอร์ ยังไม่ต้องโอนเงินตอนนี้',
-      'The shop has 3 days to accept (otherwise the order is cancelled automatically). You’ll get an email and the payment details on your order page then. Don’t pay yet.'),
-  ] : [
-    tr(`ขอบคุณที่สั่ง “${o.title}” กับ${byShop}`, `Thanks for ordering “${o.title}” from ${byShop}.`),
-    tr(`ชำระ ${baht(o.total_thb, l)} ผ่านพร้อมเพย์ได้ในหน้าออเดอร์ แล้วแนบสลิปในหน้าเดียวกัน ร้านจะเริ่มผลิตหลังตรวจสลิปแล้ว`,
-      `Pay ${baht(o.total_thb, l)} by PromptPay on your order page and attach the slip there. The shop starts making it once the payment is checked.`),
-    tr('ออเดอร์ที่ไม่ชำระภายใน 2 วันจะถูกยกเลิกอัตโนมัติ', 'Orders not paid within 2 days are cancelled automatically.'),
-  ]);
+  // placed: a quote request (no price yet) or an order at a listed price
+  if (o.is_quote) {
+    toShop('new', o.created_at, `คำขอใบเสนอราคา ${o.code}`,
+      [what, 'ลูกค้าขอให้ร้านเสนอราคา ตอบราคาหรือปฏิเสธในหน้าร้านภายใน 3 วัน ไม่อย่างนั้นคำขอจะถูกยกเลิกอัตโนมัติ']);
+    customer('new', o.created_at, tr(`ส่งคำขอราคา ${o.code} แล้ว`, `Your quote request ${o.code} is sent`), [
+      tr(`ขอราคา “${o.title}” จาก${byShop} แล้ว`, `You've asked ${byShop} for a price on “${o.title}”.`),
+      tr('ร้านจะเสนอราคาภายใน 3 วัน (ถ้าไม่ตอบ คำขอจะถูกยกเลิกอัตโนมัติ) ได้ราคาแล้วจะมีอีเมลแจ้ง คุณดูราคาแล้วค่อยตัดสินใจ ยังไม่ต้องโอนเงิน',
+        'The shop has 3 days to quote (otherwise the request is cancelled automatically). We’ll email you the price; you decide then. Don’t pay anything yet.'),
+    ]);
+  } else {
+    toShop('new', o.created_at, `ออเดอร์ใหม่ ${o.code} · ${baht(o.total_thb, 'th')}`,
+      [what, waitingForShop ? `ยอด ${baht(o.total_thb, 'th')} · รอร้านกดรับหรือปฏิเสธในหน้าร้าน` : `ยอด ${baht(o.total_thb, 'th')} · รอลูกค้าชำระและแนบสลิป`]);
+    customer('new', o.created_at, tr(`ได้รับออเดอร์ ${o.code} แล้ว`, `We've got your order ${o.code}`), waitingForShop ? [
+      tr(`ส่งคำสั่งซื้อ “${o.title}” ให้${byShop} แล้ว`, `Your order for “${o.title}” has gone to ${byShop}.`),
+      tr('รอร้านตอบรับภายใน 3 วัน (ถ้าไม่ตอบ ออเดอร์จะถูกยกเลิกอัตโนมัติ) ร้านรับแล้วจะมีอีเมลแจ้ง และเห็นช่องทางชำระเงินในหน้าออเดอร์ ยังไม่ต้องโอนเงินตอนนี้',
+        'The shop has 3 days to accept (otherwise the order is cancelled automatically). You’ll get an email and the payment details on your order page then. Don’t pay yet.'),
+    ] : [
+      tr(`ขอบคุณที่สั่ง “${o.title}” กับ${byShop}`, `Thanks for ordering “${o.title}” from ${byShop}.`),
+      tr(`ชำระ ${baht(o.total_thb, l)} ผ่านพร้อมเพย์ได้ในหน้าออเดอร์ แล้วแนบสลิปในหน้าเดียวกัน ร้านจะเริ่มผลิตหลังตรวจสลิปแล้ว`,
+        `Pay ${baht(o.total_thb, l)} by PromptPay on your order page and attach the slip there. The shop starts making it once the payment is checked.`),
+      tr('ออเดอร์ที่ไม่ชำระภายใน 2 วันจะถูกยกเลิกอัตโนมัติ', 'Orders not paid within 2 days are cancelled automatically.'),
+    ]);
+  }
+
+  // quoted (again when the shop revises the quote)
+  if (o.is_quote && o.quoted_at && o.status === 'quoted') {
+    customer(`quote:${o.quoted_at}`, o.quoted_at, tr(`${byShop} เสนอราคา ${o.code}: ${baht(o.total_thb, l)}`, `${name} quotes ${baht(o.total_thb, l)} for ${o.code}`), [
+      tr(`ราคา ${baht(o.unit_thb, l)} × ${o.quantity} + ค่าส่ง ${baht(o.shipping_thb, l)} = ${baht(o.total_thb, l)}`,
+        `${baht(o.unit_thb, l)} × ${o.quantity} + ${baht(o.shipping_thb, l)} shipping = ${baht(o.total_thb, l)}`),
+      ...(o.quote_note ? [tr(`ร้านแจ้งว่า: ${clip(o.quote_note)}`, `The shop says: ${clip(o.quote_note)}`)] : []),
+      tr('กดยอมรับราคาในหน้าออเดอร์ภายใน 3 วัน แล้วจึงชำระเงิน หรือคุยกับร้านก่อนก็ได้',
+        'Accept the price on your order page within 3 days, then pay; or talk it over with the shop there first.'),
+    ]);
+  }
+
+  // a quote accepted by the customer
+  if (o.is_quote && o.accepted_at) {
+    toShop('quote_ok', o.accepted_at, `ลูกค้ายอมรับราคา ${o.code} · ${baht(o.total_thb, 'th')}`, [what, 'รอลูกค้าโอนและแนบสลิป (ภายใน 2 วัน)']);
+    customer('accepted', o.accepted_at, tr(`ยอมรับราคาออเดอร์ ${o.code} แล้ว`, `You accepted the price for ${o.code}`), [
+      tr(`ชำระ ${baht(o.total_thb, l)} ผ่านพร้อมเพย์ของร้านได้ในหน้าออเดอร์ แล้วแนบสลิปในหน้าเดียวกัน`,
+        `Pay ${baht(o.total_thb, l)} to the shop by PromptPay on your order page and attach the slip there.`),
+      tr('เงินโอนเข้าบัญชีของร้านโดยตรง ชำระภายใน 2 วัน ไม่อย่างนั้นออเดอร์จะถูกยกเลิกอัตโนมัติ', 'The money goes straight to the shop. Pay within 2 days, or the order is cancelled automatically.'),
+    ]);
+  }
 
   // accepted by the shop (not for shops that accept by themselves)
-  if (o.accepted_at && Date.parse(o.accepted_at) - Date.parse(o.created_at) > 5000) {
+  if (!o.is_quote && o.accepted_at && Date.parse(o.accepted_at) - Date.parse(o.created_at) > 5000) {
     customer('accepted', o.accepted_at, tr(`${byShop} รับออเดอร์ ${o.code} แล้ว`, `${name} accepted your order ${o.code}`), [
       tr(`ชำระ ${baht(o.total_thb, l)} ผ่านพร้อมเพย์ของร้านได้ในหน้าออเดอร์ แล้วแนบสลิปในหน้าเดียวกัน`,
         `Pay ${baht(o.total_thb, l)} to the shop by PromptPay on your order page and attach the slip there.`),
@@ -204,7 +237,7 @@ Deno.serve(async (req) => {
   if (!Number.isSafeInteger(orderId) || orderId <= 0) return reply(400, { error: 'order_id or message_id needed' });
 
   const { data: order, error: readErr } = await db.from('orders')
-    .select('id, code, title, product, quantity, total_thb, status, created_at, updated_at, slip_at, paid_at, shipped_at, tracking_carrier, tracking_no, lang, user_id, shop_id, accepted_at, cancel_reason, cancelled_by')
+    .select('id, code, title, product, quantity, total_thb, status, created_at, updated_at, slip_at, paid_at, shipped_at, tracking_carrier, tracking_no, lang, user_id, shop_id, accepted_at, cancel_reason, cancelled_by, is_quote, quoted_at, quote_note, unit_thb, shipping_thb')
     .eq('id', orderId).maybeSingle();
   if (readErr) return reply(500, { error: `read order: ${readErr.message}`, key: keyKind });
   if (!order) return reply(404, { error: 'no such order', key: keyKind });

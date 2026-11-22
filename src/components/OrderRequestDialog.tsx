@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { Pattern } from '../types';
 import {
-  PLASTIC_COLORS, PRODUCTS, addressProblem, baht, cannotOrder, cm, emptyAddress, lastAddress, pieceMm, placeOrder,
-  sizeLabel, sizeOf, type Address, type Material, type Product,
+  PLASTIC_COLORS, PRODUCTS, addressProblem, baht, cannotOrder, cannotQuote, cm, emptyAddress, lastAddress, materialOf, pieceMm,
+  placeOrder, sizeLabel, sizeOf, type Address, type Material, type Product,
 } from '../lib/orders';
-import { postInfo, postQuotes, shopQuotes, shopStats, type ShopOffer, type ShopStats } from '../lib/shops';
+import { postInfo, postQuotes, quoteShops, shopQuotes, shopStats, type ShopOffer, type ShopStats } from '../lib/shops';
 import { ShopScore } from './ShopTrust';
 import { signInWithGoogle, useCloud } from '../lib/cloud';
 import { detectInApp } from '../lib/inAppBrowser';
@@ -99,23 +99,38 @@ function OrderForm({ pattern, onClose, postId }: { pattern: Pattern; onClose: ()
   const [rights, setRights] = useState(false);
   // the community post this design comes from (null when it's the customer's own, or the post is gone)
   const [source, setSource] = useState<{ id: string; authorShopId: number | null; allowMaking: boolean } | null>(null);
+  // asking for a price instead (0016): shops that take quote requests for this material
+  const [mode, setMode] = useState<'price' | 'quote'>('price');
+  const [qShops, setQShops] = useState<ShopOffer[]>([]);
+  const [qShopId, setQShopId] = useState<number | null>(null);
+  const [qProduct, setQProduct] = useState<Product | null>(null);
 
   const blocked = cannotOrder(pattern);
+  const quoteBlocked = cannotQuote(pattern);
   const { w, h } = pieceMm(pattern);
   const stats = computeStats(pattern);
   const used = stats.colors.filter((c) => c.count > 0).length;
   const size = material ? sizeOf(pattern, material) : null;
+  const quoting = mode === 'quote';
 
   useEffect(() => {
     let live = true;
-    if (!blocked) {
+    const mat = materialOf(pattern);
+    if (!quoteBlocked && mat) {
       Promise.all([
-        shopQuotes(pattern),
+        // a piece larger than the size table has no listed prices: only quotes
+        blocked ? Promise.resolve({ material: mat as Material | null, offers: [] as ShopOffer[] }) : shopQuotes(pattern),
         postId ? postInfo(postId).catch(() => null) : Promise.resolve(null),
-        postId ? postQuotes(postId).catch(() => []) : Promise.resolve([] as ShopOffer[]),
-      ]).then(([{ material: m, offers: list }, info, authorOffers]) => {
+        postId && !blocked ? postQuotes(postId).catch(() => []) : Promise.resolve([] as ShopOffer[]),
+        quoteShops(mat).catch(() => [] as ShopOffer[]),
+      ]).then(([{ material: m, offers: list }, info, authorOffers, quoters]) => {
         if (!live) return;
         let mine = list;
+        // a community design goes to other shops only with its author's leave
+        const q = info && postId && !info.allowMaking ? quoters.filter((o) => o.shopId === info.authorShopId) : quoters;
+        setQShops(q);
+        setQShopId(q[0]?.shopId ?? null);
+        setQProduct(PRODUCTS.find((p) => p.material === m)?.id ?? null);
         if (info && postId) {
           // other shops only with the author's leave; the author's shop sells at the post's own prices
           if (!info.allowMaking) mine = mine.filter((o) => o.shopId === info.authorShopId);
@@ -127,7 +142,9 @@ function OrderForm({ pattern, onClose, postId }: { pattern: Pattern; onClose: ()
         }
         setMaterial(m);
         setOffers(mine);
-        shopStats(mine.map((o) => o.shopId)).then((x) => { if (live) setScores(x); }).catch(() => { /* no stars */ });
+        // nothing listed at a price: start on asking for one
+        if (!mine.length && q.length) setMode('quote');
+        shopStats([...mine, ...q].map((o) => o.shopId)).then((x) => { if (live) setScores(x); }).catch(() => { /* no stars */ });
         // start on the first product some shop makes, at its cheapest shop
         const first = PRODUCTS.find((p) => p.material === m && offering(mine, p.id).length > 0);
         if (first) {
@@ -138,7 +155,7 @@ function OrderForm({ pattern, onClose, postId }: { pattern: Pattern; onClose: ()
     }
     lastAddress().then((a) => { if (live && a) setAddr((cur) => (cur.name || cur.address ? cur : a)); }).catch(() => { /* fill in by hand */ });
     return () => { live = false; };
-  }, [pattern, blocked, postId]);
+  }, [pattern, blocked, quoteBlocked, postId]);
 
   const products = PRODUCTS.filter((p) => p.material === material && offering(offers, p.id).length > 0);
   const forProduct = product ? offering(offers, product).sort(sortOffers(product)) : [];
@@ -154,19 +171,23 @@ function OrderForm({ pattern, onClose, postId }: { pattern: Pattern; onClose: ()
   const plastic = color === 'other' ? otherColor : color;
   const addrErr = addressProblem(addr);
   const colorErr = material === '3d' && color === 'other' && !otherColor.trim() ? t('บอกสีที่ต้องการ', 'Say which color you want') : null;
-  const canOrder = !blocked && !!shop && !!product && !busy;
+  const qShop = qShops.find((o) => o.shopId === qShopId) ?? null;
+  // the shop the form is for: the priced one, or the one asked for a price
+  const active = quoting ? qShop : shop;
+  const canOrder = quoting ? !quoteBlocked && !!qShop && !!qProduct && !busy : !blocked && !!shop && !!product && !busy;
   // the author selling their own design needs no word on its rights
-  const byAuthor = !!source && !!shop && shop.shopId === source.authorShopId;
+  const byAuthor = !!source && !!active && active.shopId === source.authorShopId;
   const needRights = !byAuthor;
 
   const order = async () => {
     setTried(true);
-    if (!canOrder || !shop || !product || addrErr || colorErr || !agree || (needRights && !rights)) return;
+    const pick = quoting ? qProduct : product;
+    if (!canOrder || !active || !pick || addrErr || colorErr || !agree || (needRights && !rights)) return;
     setBusy(true);
     setErr('');
     try {
       const code = await placeOrder(pattern, {
-        shopId: shop.shopId, product, plasticColor: material === '3d' ? plastic : '', quantity: qty, note, address: addr, rightsConfirmed: needRights ? rights : true,
+        quote: quoting, shopId: active.shopId, product: pick, plasticColor: material === '3d' ? plastic : '', quantity: qty, note, address: addr, rightsConfirmed: needRights ? rights : true,
         postId: source?.id ?? null,
       });
       trackStep('/order/2-placed');
@@ -190,11 +211,12 @@ function OrderForm({ pattern, onClose, postId }: { pattern: Pattern; onClose: ()
             <b>{pattern.name}</b>
             <span className="muted small">{kind} · {cm(w)} × {cm(h)} {t('ซม.', 'cm')} · {t(`${used} สี`, `${used} ${used === 1 ? 'color' : 'colors'}`)}</span>
             {material && size && <span className="muted small">{sizeLabel(material, size)}</span>}
+            {material && !size && !quoteBlocked && <span className="muted small">{t('ใหญ่กว่าตารางราคา: ขอใบเสนอราคาจากร้านได้', 'Larger than the price table: ask a shop for a price')}</span>}
           </div>
         </div>
-        {blocked && <p className="error small">{blocked}</p>}
-        {!blocked && offers === null && <p className="muted small">{t('กำลังหาร้านที่รับผลิต…', 'Finding shops that make this…')}</p>}
-        {!blocked && offers && offers.length === 0 && !err && (
+        {(quoteBlocked || (blocked && !quoting)) && <p className={quoteBlocked ? 'error small' : 'muted small'}>{quoteBlocked ?? blocked}</p>}
+        {!quoteBlocked && offers === null && <p className="muted small">{t('กำลังหาร้านที่รับผลิต…', 'Finding shops that make this…')}</p>}
+        {!quoting && !quoteBlocked && offers && offers.length === 0 && !err && (
           <div className="order-none">
             <p><b>{t('ยังไม่มีร้านที่รับผลิตลายนี้', 'No shop makes this design yet')}</b></p>
             <p className="muted small">{source && !source.allowMaking
@@ -204,7 +226,19 @@ function OrderForm({ pattern, onClose, postId }: { pattern: Pattern; onClose: ()
           </div>
         )}
 
-        {products.length > 0 && (
+        {!quoting && qShops.length > 0 && offers !== null && (
+          <p className="order-quote-switch">
+            <button type="button" className="link-btn inline" onClick={() => setMode('quote')}>{t('ไม่เจอแบบหรือขนาดที่ต้องการ? ขอใบเสนอราคาจากร้าน', 'Not what you need? Ask a shop for a price')}</button>
+            <span className="muted small"> {t(`(${qShops.length} ร้านรับ)`, `(${qShops.length} shop${qShops.length === 1 ? '' : 's'})`)}</span>
+          </p>
+        )}
+        {quoting && (
+          <QuotePicker material={material} products={PRODUCTS.filter((p) => p.material === material)} product={qProduct} onProduct={setQProduct}
+            shops={qShops} shopId={qShopId} onShop={setQShopId} scores={scores} source={source} stitches={stats.total}
+            onBack={offers && offers.length > 0 ? () => setMode('price') : null} />
+        )}
+
+        {!quoting && products.length > 0 && (
           <div className="fb-field">
             <span>{t('อยากได้แบบไหน', 'What would you like?')}</span>
             <div className="order-products" role="radiogroup" aria-label={t('แบบสินค้า', 'Product')}>
@@ -225,7 +259,7 @@ function OrderForm({ pattern, onClose, postId }: { pattern: Pattern; onClose: ()
           </div>
         )}
 
-        {product && forProduct.length > 0 && (
+        {!quoting && product && forProduct.length > 0 && (
           <div className="fb-field">
             <span>{forProduct.length > 1 ? t(`เลือกร้าน · ${forProduct.length} ร้านทำได้`, `Choose a shop · ${forProduct.length} can make it`) : t('ร้านที่ผลิต', 'Made by')}</span>
             <div className="order-shops" role="radiogroup" aria-label={t('ร้าน', 'Shop')}>
@@ -248,7 +282,7 @@ function OrderForm({ pattern, onClose, postId }: { pattern: Pattern; onClose: ()
           </div>
         )}
 
-        {shop && material === '3d' && (
+        {active && material === '3d' && (
           <div className="fb-field">
             <span>{t('สีพลาสติกของชิ้นงาน', 'Plastic color')}</span>
             <div className="publish-tags">
@@ -265,7 +299,7 @@ function OrderForm({ pattern, onClose, postId }: { pattern: Pattern; onClose: ()
           </div>
         )}
 
-        {shop && (
+        {active && (
           <>
             <div className="fb-field">
               <span>{t('จำนวน', 'Quantity')}</span>
@@ -294,22 +328,26 @@ function OrderForm({ pattern, onClose, postId }: { pattern: Pattern; onClose: ()
             </fieldset>
 
             <label className="fb-field">
-              <span>{t(`ข้อความถึงร้าน ${shop.shopName} (ไม่บังคับ)`, `Note to ${shop.shopName} (optional)`)}</span>
-              <textarea id="order-note" value={note} maxLength={1000} rows={2} onChange={(e) => setNote(e.target.value)}
-                placeholder={t('เช่น อยากได้ภายในวันที่ 20 ธ.ค. เป็นของขวัญ', 'e.g. needed by 20 Dec as a gift')} />
+              <span>{quoting ? t(`บอกร้าน ${active.shopName} ว่าอยากได้แบบไหน`, `Tell ${active.shopName} what you’d like`) : t(`ข้อความถึงร้าน ${active.shopName} (ไม่บังคับ)`, `Note to ${active.shopName} (optional)`)}</span>
+              <textarea id="order-note" value={note} maxLength={1000} rows={quoting ? 3 : 2} onChange={(e) => setNote(e.target.value)}
+                placeholder={quoting ? t('เช่น ขนาดจริงที่อยากได้ ชนิดผ้า สีกรอบ วันที่อยากได้', 'e.g. the size you want, fabric, frame colour, when you need it')
+                  : t('เช่น อยากได้ภายในวันที่ 20 ธ.ค. เป็นของขวัญ', 'e.g. needed by 20 Dec as a gift')} />
             </label>
 
-            {total !== null && unit !== null && (
+            {!quoting && shop && total !== null && unit !== null && (
               <dl className="order-sum" aria-label={t('สรุปราคา', 'Price')}>
                 <div><dt>{t(`ชิ้นงาน ${baht(unit)} × ${qty}`, `Piece ${baht(unit)} × ${qty}`)}</dt><dd>{baht(unit * qty)}</dd></div>
                 <div><dt>{t('ค่าจัดส่ง', 'Shipping')}</dt><dd>{baht(shop.shippingThb)}</dd></div>
                 <div className="order-total"><dt>{t('รวม', 'Total')}</dt><dd>{baht(total)}</dd></div>
               </dl>
             )}
-            <p className="hint">{shop.official
+            <p className="hint">{quoting
+              ? t(`ร้าน ${active.shopName} จะเสนอราคาต่อชิ้นและค่าส่งภายใน 3 วัน คุณดูราคาแล้วค่อยตัดสินใจยอมรับ ยังไม่ต้องโอนเงิน`,
+                `${active.shopName} will quote a price per piece and shipping within 3 days. You decide once you see it; don’t pay anything now.`)
+              : active.official
               ? t('กดสั่งแล้วจะไปที่หน้าออเดอร์ เพื่อชำระเงินผ่านพร้อมเพย์และแนบสลิป ทีมเริ่มผลิตหลังตรวจสลิปแล้ว', 'After ordering you’ll go to the order page to pay by PromptPay and attach the slip; the team starts once the payment is checked.')
-              : t(`กดสั่งแล้ว ร้าน ${shop.shopName} จะตอบรับภายใน 3 วัน จากนั้นจึงชำระเงินผ่านพร้อมเพย์ของร้านในหน้าออเดอร์ ยังไม่ต้องโอนตอนนี้`,
-                `${shop.shopName} answers within 3 days; then you pay the shop by PromptPay on the order page. Don’t pay now.`)}</p>
+              : t(`กดสั่งแล้ว ร้าน ${active.shopName} จะตอบรับภายใน 3 วัน จากนั้นจึงชำระเงินผ่านพร้อมเพย์ของร้านในหน้าออเดอร์ ยังไม่ต้องโอนตอนนี้`,
+                `${active.shopName} answers within 3 days; then you pay the shop by PromptPay on the order page. Don’t pay now.`)}</p>
 
             {needRights && (
               <label className="check order-agree">
@@ -333,9 +371,65 @@ function OrderForm({ pattern, onClose, postId }: { pattern: Pattern; onClose: ()
       <footer className="modal-foot fb-foot">
         <button className="btn" onClick={onClose}>{t('ยกเลิก', 'Cancel')}</button>
         <button className="btn primary" onClick={order} disabled={!canOrder}>
-          <Icon name="check" size={16} /> {busy ? t('กำลังสั่ง…', 'Ordering…') : total !== null ? t(`สั่งเลย · ${baht(total)}`, `Place order · ${baht(total)}`) : t('สั่งเลย', 'Place order')}
+          <Icon name="check" size={16} /> {busy ? t('กำลังส่ง…', 'Sending…') : quoting ? t('ส่งคำขอราคา', 'Ask for a price') : total !== null ? t(`สั่งเลย · ${baht(total)}`, `Place order · ${baht(total)}`) : t('สั่งเลย', 'Place order')}
         </button>
       </footer>
+    </>
+  );
+}
+
+/** Asking for a price: what to make and which shop to ask (shops that take quote requests for this material). */
+function QuotePicker({ material, products, product, onProduct, shops, shopId, onShop, scores, source, stitches, onBack }: {
+  material: Material | null; products: typeof PRODUCTS; product: Product | null; onProduct: (p: Product) => void;
+  shops: ShopOffer[]; shopId: number | null; onShop: (id: number) => void; scores: Map<number, ShopStats>;
+  source: { authorShopId: number | null } | null; stitches: number; onBack: (() => void) | null;
+}) {
+  return (
+    <>
+      <div className="order-quote-head">
+        <p><b>{t('ขอใบเสนอราคา', 'Ask for a price')}</b> {t('สำหรับแบบหรือขนาดที่ไม่มีในตารางราคา ร้านจะเสนอราคาให้ดูก่อน แล้วคุณค่อยตัดสินใจ', 'For what shops don’t list. The shop names a price first, then you decide.')}</p>
+        {onBack && <button type="button" className="link-btn inline" onClick={onBack}>{t('กลับไปดูร้านที่มีราคา', 'Back to listed prices')}</button>}
+      </div>
+      {shops.length === 0 ? (
+        <div className="order-none">
+          <p><b>{t('ยังไม่มีร้านที่รับขอราคางานนี้', 'No shop takes quote requests for this yet')}</b></p>
+          <p className="muted small">{t(`ยังไม่มีร้านที่เปิดรับขอราคา${material === 'fabric' ? 'ลายบนผ้า' : 'ชิ้นงาน 3D'} ลองปรับขนาดลาย หรือกลับมาดูใหม่เมื่อมีร้านเพิ่ม`,
+            `No open shop takes quote requests for ${material === 'fabric' ? 'fabric pieces' : '3D pieces'} yet. Try another size, or check back as more shops open.`)}</p>
+        </div>
+      ) : (
+        <>
+          <div className="fb-field">
+            <span>{t('อยากได้แบบไหน', 'What would you like?')}</span>
+            <div className="order-products" role="radiogroup" aria-label={t('แบบสินค้า', 'Product')}>
+              {products.map((p) => (
+                <label key={p.id} className={'order-product' + (product === p.id ? ' on' : '')}>
+                  <input type="radio" name="quote-product" checked={product === p.id} onChange={() => onProduct(p.id)} />
+                  <span><b>{p.name()}<em className="order-each">{t('ขอราคา', 'ask')}</em></b>
+                    <small>{p.desc()}{p.perStitch && ` ${t(`(ลายนี้ ${stitches.toLocaleString()} ฝีเข็ม)`, `(${stitches.toLocaleString()} stitches in this pattern)`)}`}</small></span>
+                </label>
+              ))}
+            </div>
+          </div>
+          <div className="fb-field">
+            <span>{shops.length > 1 ? t(`ขอราคาจากร้าน · ${shops.length} ร้านรับ`, `Ask a shop · ${shops.length} take requests`) : t('ขอราคาจาก', 'Ask')}</span>
+            <div className="order-shops" role="radiogroup" aria-label={t('ร้าน', 'Shop')}>
+              {shops.map((o) => (
+                <label key={o.shopId} className={'order-shop' + (o.shopId === shopId ? ' on' : '')}>
+                  <input type="radio" name="quote-shop" checked={o.shopId === shopId} onChange={() => onShop(o.shopId)} />
+                  <span>
+                    <b className="order-shop-head"><span>{o.shopName}{o.official && <span className="order-team">{t('ทีม', 'Team')}</span>}{!o.official && source && o.shopId === source.authorShopId && <span className="order-team">{t('เจ้าของลาย', 'The designer')}</span>}</span></b>
+                    <small>
+                      <ShopScore {...(scores.get(o.shopId) ?? { delivered: o.delivered, reviews: 0, rating: null })} official={o.official} />
+                      {o.leadTime && <> · {t(`ปกติผลิต ${o.leadTime}`, `usually ready in ${o.leadTime}`)}</>}
+                    </small>
+                    <small><a className="acct-link" href={`#/shops/${o.shopId}`} target="_blank" rel="noopener" onClick={(e) => e.stopPropagation()}>{t('ดูหน้าร้านและรีวิว', 'See the shop and its reviews')}</a></small>
+                  </span>
+                </label>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
     </>
   );
 }

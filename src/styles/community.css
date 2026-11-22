@@ -353,3 +353,9 @@
 /* "made to order · from ฿X" on community cards (components/PostCard.tsx) */
 .sale-badge { position: absolute; left: 8px; bottom: 8px; max-width: calc(100% - 16px); font-size: 11.5px; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: #2f7d4fe6; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
+
+/* ---------- asking for a price (components/OrderRequestDialog.tsx, ShopOrderCard.tsx, phase 4b) ---------- */
+.order-quote-switch { margin: 0; }
+.order-quote-head { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 10px 12px; border-radius: 12px; background: var(--bg); }
+.order-quote-head p { margin: 0; font-size: 14px; line-height: 1.5; }
+.shop-quote-pick { display: flex; flex-wrap: wrap; gap: 6px 18px; }
