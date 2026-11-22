@@ -327,6 +327,7 @@
 .mod-review:last-child { border-bottom: 0; padding-bottom: 0; }
 .mod-review .review-item { border-top: 0; padding: 0; align-self: stretch; }
 .order-report, .shop-public-link { margin: 0; }
+.review-item .small, .review-form .small, .order-review-box .small, .order-my-review .small, .shop-sale-card .small { font-size: 13px; }
 
 /* a shop's public page (pages/ShopProfile.tsx) */
 .shop-hero-head { display: flex; align-items: flex-start; gap: 14px; }
@@ -341,6 +342,9 @@
 .shop-sale-thumb { height: 104px; display: grid; place-items: center; border-radius: 8px; margin-bottom: 4px; overflow: hidden; background: repeating-conic-gradient(#f2ede4 0 25%, #f8f5ef 0 50%) 0 0 / 16px 16px; }
 .shop-sale-thumb canvas { max-width: 90%; max-height: 92px; width: auto !important; height: auto !important; }
 .shop-profile .rate-card { overflow-x: auto; }
+.shop-hero-head p { margin: 0; font-size: 13px; }
+.shop-profile .order-price-table td { white-space: nowrap; }
+.shop-profile .order-price-table thead small { display: block; }
 @media (max-width: 600px) {
   .shop-for-sale { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .shop-hero h1 { font-size: 19px; }
