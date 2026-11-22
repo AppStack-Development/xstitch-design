@@ -46,6 +46,8 @@ export interface Post {
   tags: string[];
   data: string;
   remixOf: string | null;
+  /** the author lets other shops make this design (0014) */
+  allowMaking: boolean;
   status: 'published' | 'hidden' | 'removed';
   likeCount: number;
   createdAt: string;
@@ -53,7 +55,7 @@ export interface Post {
   author: { id: string; name: string; official: boolean };
 }
 
-const COLUMNS = 'id, title, description, base, difficulty, colors, stitches, cols, rows, template_name, tags, data, remix_of, status, like_count, created_at, updated_at, author, creators(display_name, official)';
+const COLUMNS = 'id, title, description, base, difficulty, colors, stitches, cols, rows, template_name, tags, data, remix_of, status, like_count, created_at, updated_at, author, allow_making, creators(display_name, official)';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function toPost(r: any): Post {
@@ -61,7 +63,7 @@ function toPost(r: any): Post {
     id: r.id, title: r.title, description: r.description ?? '', base: r.base, difficulty: r.difficulty,
     colors: r.colors, stitches: r.stitches, cols: r.cols, rows: r.rows, templateName: r.template_name,
     tags: r.tags ?? [], data: r.data, remixOf: r.remix_of, status: r.status, likeCount: r.like_count,
-    createdAt: r.created_at, updatedAt: r.updated_at,
+    createdAt: r.created_at, updatedAt: r.updated_at, allowMaking: !!r.allow_making,
     author: { id: r.author, name: r.creators?.display_name ?? t('ไม่ระบุชื่อ', 'Unknown'), official: !!r.creators?.official },
   };
 }

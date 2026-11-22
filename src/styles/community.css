@@ -294,3 +294,10 @@
 .rate-card > b { font-size: 14px; }
 .rate-card .order-price-table input::placeholder { color: var(--ink-3); }
 .shop-open-notes { margin: 0; padding-left: 18px; color: var(--ink-2); line-height: 1.6; }
+
+/* ---------- selling your own post (components/SellPostPanel.tsx) ---------- */
+.sell-post { margin-top: 12px; }
+.sell-post > summary { cursor: pointer; font-weight: 600; display: flex; align-items: center; gap: 6px; }
+.sell-post[open] > summary { margin-bottom: 10px; }
+.sell-post .order-price-table th small { display: block; font-weight: 400; color: var(--ink-3); font-size: 12px; line-height: 1.4; }
+.sell-post .order-price-table td { width: 110px; }

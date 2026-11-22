@@ -124,6 +124,41 @@ export async function saveRates(shopId: number, rates: Rates): Promise<void> {
   }
 }
 
+// ---------- selling your own community posts (0014) ----------
+
+/** A post's own prices (product -> baht), whether other shops may make it, and its author's shop, if any. */
+export async function postInfo(postId: string): Promise<{ prices: Partial<Record<Product, number>>; allowMaking: boolean; authorShopId: number | null } | null> {
+  const c = await client();
+  const { data: post } = await c.from('posts').select('author, allow_making').eq('id', postId).maybeSingle();
+  if (!post) return null;
+  const [{ data: rows }, { data: shop }] = await Promise.all([
+    c.from('post_prices').select('product, price_thb').eq('post_id', postId),
+    c.from('shops').select('id').eq('owner_id', post.author).maybeSingle(),
+  ]);
+  return {
+    prices: Object.fromEntries((rows ?? []).map((r) => [r.product, r.price_thb])),
+    allowMaking: !!post.allow_making,
+    authorShopId: shop?.id ?? null,
+  };
+}
+
+/** Set your post's prices (anything left out is no longer sold) and whether other shops may make it. */
+export async function savePostSale(postId: string, prices: Partial<Record<Product, number>>, allowMaking: boolean): Promise<void> {
+  const c = await client();
+  const current = await postInfo(postId);
+  const rows = Object.entries(prices).map(([product, price]) => ({ post_id: postId, product, price_thb: price }));
+  if (rows.length) {
+    const { error } = await c.from('post_prices').upsert(rows);
+    if (error) throw new Error(error.message);
+  }
+  for (const product of Object.keys(current?.prices ?? {}).filter((p) => !(p in prices))) {
+    const { error } = await c.from('post_prices').delete().eq('post_id', postId).eq('product', product);
+    if (error) throw new Error(error.message);
+  }
+  const { error } = await c.from('posts').update({ allow_making: allowMaking }).eq('id', postId);
+  if (error) throw new Error(error.message);
+}
+
 // ---------- quotes: who can make this piece, for how much ----------
 
 export interface ShopOffer {
@@ -131,6 +166,28 @@ export interface ShopOffer {
   kitNote: string; delivered: number; openedAt: string;
   /** product -> baht per piece, for the products this shop makes at this size */
   prices: Partial<Record<Product, number>>;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function toOffers(data: any[] | null): ShopOffer[] {
+  const byShop = new Map<number, ShopOffer>();
+  for (const r of data ?? []) {
+    const o: ShopOffer = byShop.get(r.shop_id) ?? {
+      shopId: r.shop_id, shopName: r.shop_name, about: r.about ?? '', leadTime: r.lead_time ?? '', shippingThb: r.shipping_thb,
+      official: r.official, kitNote: r.kit_note ?? '', delivered: Number(r.delivered ?? 0), openedAt: r.opened_at, prices: {},
+    };
+    if (r.unit_thb != null) o.prices[r.product as Product] = r.unit_thb;
+    byShop.set(r.shop_id, o);
+  }
+  return [...byShop.values()];
+}
+
+/** The post's author's shop, if it's taking orders, with the post's own prices. */
+export async function postQuotes(postId: string): Promise<ShopOffer[]> {
+  const c = await client();
+  const { data, error } = await c.rpc('post_quotes', { pid: postId });
+  if (error) throw new Error(error.message);
+  return toOffers(data);
 }
 
 /** Every shop taking orders that makes this pattern at its size, priced by the database. */
@@ -142,17 +199,7 @@ export async function shopQuotes(p: Pattern): Promise<{ material: Material | nul
     p_material: material, p_cols: p.cols, p_rows: p.rows, p_pitch: Math.round(p.pitchMm * 100) / 100, p_stitches: computeStats(p).total,
   });
   if (error) throw new Error(error.message);
-  const byShop = new Map<number, ShopOffer>();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  for (const r of (data ?? []) as any[]) {
-    const o: ShopOffer = byShop.get(r.shop_id) ?? {
-      shopId: r.shop_id, shopName: r.shop_name, about: r.about ?? '', leadTime: r.lead_time ?? '', shippingThb: r.shipping_thb,
-      official: r.official, kitNote: r.kit_note ?? '', delivered: Number(r.delivered ?? 0), openedAt: r.opened_at, prices: {},
-    };
-    if (r.unit_thb != null) o.prices[r.product as Product] = r.unit_thb;
-    byShop.set(r.shop_id, o);
-  }
-  return { material, offers: [...byShop.values()] };
+  return { material, offers: toOffers(data) };
 }
 
 // ---------- payment details (only the shop's workers read them) ----------

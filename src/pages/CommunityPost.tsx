@@ -21,7 +21,9 @@ import { AccountButton } from '../components/AccountButton';
 import { LikeButton, TeamBadge, usePostPattern } from '../components/PostCard';
 import { PrintView } from './PrintView';
 import { OrderRequestDialog } from '../components/OrderRequestDialog';
-import { ordersEnabled } from '../lib/orders';
+import { baht, ordersEnabled } from '../lib/orders';
+import { postQuotes } from '../lib/shops';
+import { SellPostPanel } from '../components/SellPostPanel';
 import { fabricLabel } from '../lib/fabrics';
 
 const REPORTED_KEY = 'sbs:reported';
@@ -41,6 +43,8 @@ export function CommunityPost({ id }: { id: string }) {
   const [reporting, setReporting] = useState(false);
   const [copied, setCopied] = useState(false);
   const [ordering, setOrdering] = useState(false);
+  // the cheapest price the author's shop sells this pattern for (null = not sold by its author)
+  const [authorFrom, setAuthorFrom] = useState<number | null>(null);
   const p = usePostPattern(post);
 
   useEffect(() => {
@@ -51,6 +55,17 @@ export function CommunityPost({ id }: { id: string }) {
       .catch((e) => { if (!live) return; setErr((e as Error).message); setState('error'); });
     return () => { live = false; };
   }, [id]);
+
+  useEffect(() => {
+    if (!post || !ordersEnabled) return;
+    let live = true;
+    postQuotes(post.id).then((offers) => {
+      if (!live) return;
+      const all = offers.flatMap((o) => Object.values(o.prices) as number[]);
+      setAuthorFrom(all.length ? Math.min(...all) : null);
+    }).catch(() => { /* no price shown */ });
+    return () => { live = false; };
+  }, [post?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!post) return;
@@ -184,11 +199,22 @@ export function CommunityPost({ id }: { id: string }) {
               <Icon name="edit" size={16} /> {busy === 'copy' ? t('กำลังเปิด…', 'Opening…') : t('แก้ไขเป็นสำเนาของฉัน', 'Edit as my copy')}
             </button>
           </div>
-          {/* pilot: only the team's own 3D patterns can be ordered; other designers' patterns need their permission first */}
-          {ordersEnabled && post.author.official && post.base === 'print3d' && p && (
+          {/* orderable when its author's shop sells it, the author lets other shops make it, or it's the team's 3D pattern */}
+          {ordersEnabled && p && (authorFrom !== null || post.allowMaking || (post.author.official && post.base === 'print3d')) && (
             <button className="btn order-cta" onClick={() => setOrdering(true)}>
-              <Icon name="send" size={16} /> {t('สั่งผลิตชิ้นนี้ (พิมพ์ + ด้ายพร้อมปัก)', 'Order this piece (printed + threads)')}
+              <Icon name="send" size={16} /> {authorFrom !== null
+                ? t(`สั่งผลิตลายนี้ · จาก ${baht(authorFrom)}`, `Have it made · from ${baht(authorFrom)}`)
+                : t('สั่งผลิตลายนี้', 'Have it made')}
             </button>
+          )}
+          {ordersEnabled && cloud.user?.id === post.author.id && (
+            <SellPostPanel post={post} onSaved={(allowMaking) => {
+              setPost({ ...post, allowMaking });
+              postQuotes(post.id).then((offers) => {
+                const all = offers.flatMap((o) => Object.values(o.prices) as number[]);
+                setAuthorFrom(all.length ? Math.min(...all) : null);
+              }).catch(() => { /* keep */ });
+            }} />
           )}
           <div className="post-tools">
             <LikeButton post={post} liked={liked} onChange={(on, count) => { setLiked(on); setPost({ ...post, likeCount: count }); }} />
@@ -225,7 +251,7 @@ export function CommunityPost({ id }: { id: string }) {
         </div>
       </div>
       {reporting && <ReportDialog postId={post.id} onClose={() => setReporting(false)} />}
-      {ordering && p && <OrderRequestDialog pattern={p} onlyOfficial onClose={() => setOrdering(false)} />}
+      {ordering && p && <OrderRequestDialog pattern={p} postId={post.id} onClose={() => setOrdering(false)} />}
     </div>
   );
 }

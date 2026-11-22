@@ -97,6 +97,7 @@ export function ShopOrderCard({ order, shop, onChanged }: { order: Order; shop: 
           <li><span>{t('ยอด', 'Total')}</span><b>{baht(o.total)}</b></li>
         </ul>
         <p className="order-addr small">{o.address.name} · {o.address.phone}<br />{o.address.address} {o.address.postcode}</p>
+        {o.postId && <p className="small"><a className="acct-link" href={`#/c/${o.postId}`}>{t('ลายจากชุมชน: เปิดดูลายต้นฉบับ', 'From a community pattern: see the original')}</a></p>}
         {o.note && <p className="review-note">{o.note}</p>}
 
         <div className="order-next">

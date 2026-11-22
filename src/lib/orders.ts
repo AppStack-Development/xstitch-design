@@ -154,6 +154,9 @@ export function friendlyOrderError(message: string): string {
   if (/no price set/.test(message)) return t('ยังไม่ได้ตั้งราคาสำหรับแบบนี้ ลองเลือกแบบอื่น', 'This option has no price yet. Try another one.');
   if (/terms not accepted/.test(message)) return t('ต้องยอมรับเงื่อนไขการสั่งซื้อก่อน', 'Please accept the order terms first.');
   if (/seller terms not accepted/.test(message)) return t('ต้องยอมรับข้อกำหนดผู้ขายก่อนเปิดร้าน', 'Accept the seller terms to open a shop.');
+  if (/design not allowed/.test(message)) return t('เจ้าของลายยังไม่อนุญาตให้ร้านอื่นผลิตลายนี้', 'The pattern’s author doesn’t let other shops make it.');
+  if (/design not available/.test(message)) return t('ลายนี้ไม่ได้เปิดให้เห็นในชุมชนแล้ว', 'This pattern is no longer shown in the community.');
+  if (/wrong product/.test(message)) return t('สินค้านี้ไม่ตรงกับชนิดของลาย', 'That product doesn’t fit this kind of pattern.');
   if (/rights not confirmed/.test(message)) return t('ยืนยันก่อนว่าคุณมีสิทธิ์ให้ผลิตลายนี้', 'Confirm you may have this design made first.');
   if (/set up PromptPay first/.test(message)) return t('ตั้งพร้อมเพย์ในตั้งค่าร้านก่อนรับออเดอร์', 'Set up PromptPay in the shop settings before accepting orders.');
   if (/cannot be cancelled/.test(message)) return t('ยกเลิกได้เฉพาะออเดอร์ที่ยังไม่ได้ชำระเงิน', 'Only unpaid orders can be cancelled.');
@@ -173,6 +176,8 @@ export interface OrderOptions {
   shopId: number; product: Product; plasticColor: string; quantity: number; note: string; address: Address;
   /** the customer's word that they may have this design made */
   rightsConfirmed: boolean;
+  /** the community post this design comes from (its own, or a copy of it), if any */
+  postId?: string | null;
 }
 
 /** Place an order; returns its code. Size and price are worked out again by the database. */
@@ -189,7 +194,7 @@ export async function placeOrder(p: Pattern, o: OrderOptions): Promise<string> {
     quantity: Math.min(20, Math.max(1, Math.round(o.quantity))), note: o.note.trim().slice(0, 1000), lang,
     ship_name: o.address.name.trim().slice(0, 100), ship_phone: o.address.phone.trim(),
     ship_address: o.address.address.trim().slice(0, 500), ship_postcode: o.address.postcode.trim(),
-    terms_version: ORDER_TERMS_VERSION, shop_id: o.shopId, rights_confirmed: o.rightsConfirmed,
+    terms_version: ORDER_TERMS_VERSION, shop_id: o.shopId, rights_confirmed: o.rightsConfirmed, post_id: o.postId ?? null,
   };
   // a clash of two random codes is very unlikely; try once more if it happens
   for (let attempt = 0; attempt < 2; attempt++) {
@@ -216,10 +221,11 @@ export interface Order {
   termsVersion: string;
   shopId: number | null; acceptedAt: string | null;
   cancelReason: string; cancelledBy: 'customer' | 'shop' | 'system' | null; refundConfirmed: boolean;
+  postId: string | null;
 }
 
 // the delivery address isn't a readable column (0013): it comes from orderAddresses()
-export const ORDER_COLS = 'id, code, created_at, updated_at, user_id, title, template_name, cols, rows, pitch_mm, size, colors, stitches, data, product, plastic_color, quantity, note, unit_thb, shipping_thb, total_thb, status, slip_path, slip_at, paid_at, tracking_carrier, tracking_no, shipped_at, closed_at, terms_version, shop_id, accepted_at, cancel_reason, cancelled_by, refund_confirmed';
+export const ORDER_COLS = 'id, code, created_at, updated_at, user_id, title, template_name, cols, rows, pitch_mm, size, colors, stitches, data, product, plastic_color, quantity, note, unit_thb, shipping_thb, total_thb, status, slip_path, slip_at, paid_at, tracking_carrier, tracking_no, shipped_at, closed_at, terms_version, shop_id, accepted_at, cancel_reason, cancelled_by, refund_confirmed, post_id';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function toOrder(r: any): Order {
@@ -235,6 +241,7 @@ export function toOrder(r: any): Order {
     termsVersion: r.terms_version ?? '',
     shopId: r.shop_id ?? null, acceptedAt: r.accepted_at ?? null,
     cancelReason: r.cancel_reason ?? '', cancelledBy: r.cancelled_by ?? null, refundConfirmed: !!r.refund_confirmed,
+    postId: r.post_id ?? null,
   };
 }
 
