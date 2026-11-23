@@ -42,11 +42,12 @@ export function AccountButton() {
   if (cloudEnabled && cloud.status === 'signed-in' && cloud.user) {
     const label = `${cloud.user.name} · ${syncLabel(cloud.sync)}`;
     return (
-      <a className="btn ghost account-btn icon-only" href="#/account" title={label} aria-label={t(`บัญชี: ${label}`, `Account: ${label}`)}>
+      <a className="btn ghost account-btn signed-in" href="#/account" title={label} aria-label={t(`ของฉัน: ${label}`, `My stuff: ${label}`)}>
         <span className="account-av">
           <Avatar user={cloud.user} size={24} />
           <i className={'sync-dot ' + cloud.sync} />
         </span>
+        <span className="account-label">{t('ของฉัน', 'My stuff')}</span>
       </a>
     );
   }

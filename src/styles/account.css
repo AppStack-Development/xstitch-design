@@ -7,9 +7,15 @@
 .account-btn { gap: 6px; }
 /* avatar / icon only: square, same height as its neighbours */
 .site-head .btn.account-btn.icon-only { width: var(--hdr); padding-inline: 0; }
+/* signed in: avatar plus "ของฉัน", a little tighter on the avatar side */
+.site-head .btn.account-btn.signed-in { padding-left: 8px; }
 @media (max-width: 600px) {
   .account-btn .account-label { display: none; }
-  .site-head .btn.account-btn.signed-out { width: var(--hdr); padding-inline: 0; }
+  .site-head .btn.account-btn.signed-out, .site-head .btn.account-btn.signed-in { width: var(--hdr); padding-inline: 0; }
+  /* on the home page there's room, and it's the way to My patterns */
+  .home .site-head .account-btn .account-label { display: inline; }
+  .home .site-head .btn.account-btn.signed-out { width: auto; padding-inline: 12px; }
+  .home .site-head .btn.account-btn.signed-in { width: auto; padding-inline: 8px 12px; }
 }
 
 .account-av { position: relative; display: inline-grid; place-items: center; }
