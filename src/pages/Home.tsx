@@ -1,8 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Icon } from '../components/Icon';
 import { LogoMark, Wordmark } from '../components/LogoMark';
 import { useInstall } from '../lib/pwa';
-import { TEMPLATES } from '../lib/templates';
 import { t } from '../lib/i18n';
 import { LangSwitch } from '../components/LangSwitch';
 import { AccountButton } from '../components/AccountButton';
@@ -19,54 +18,66 @@ import { computeProgress } from '../lib/progress';
 import { PATTERNS_PULLED } from '../lib/sync';
 import type { Pattern } from '../types';
 
-/**
- * Card art drawn from the real heart-keychain template, so every hole sits exactly
- * where the printable model has one. Holes 2+ cells in from the frame are shown
- * stitched in gold, which traces a smaller heart inside.
- */
-function TemplateArt() {
-  const { cols, rows, mask, depth } = useMemo(() => {
-    const t = TEMPLATES.find((x) => x.id === 'keychain-heart')!;
-    const r = t.build(14, Math.round((14 * t.h) / t.w));
-    // Chebyshev distance of each hole from the nearest non-hole cell
-    const n = r.cols * r.rows;
-    const d = new Int32Array(n).fill(1e9);
-    const queue: number[] = [];
-    for (let i = 0; i < n; i++) if (r.mask[i] !== '2') { d[i] = 0; queue.push(i); }
-    for (let q = 0; q < queue.length; q++) {
-      const i = queue[q], x = i % r.cols, y = (i / r.cols) | 0;
-      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
-        const nx = x + dx, ny = y + dy;
-        if (nx < 0 || ny < 0 || nx >= r.cols || ny >= r.rows) continue;
-        const j = ny * r.cols + nx;
-        if (d[j] > d[i] + 1) { d[j] = d[i] + 1; queue.push(j); }
-      }
-    }
-    return { ...r, depth: d };
-  }, []);
-  const s = 6;
-  const cells: JSX.Element[] = [];
-  for (let y = 0; y < rows; y++) {
-    for (let x = 0; x < cols; x++) {
-      const i = y * cols + x, k = mask[i];
-      if (k === '0') continue;
-      const px = x * s, py = y * s;
-      // slight overlap hides hairline seams between frame cells
-      cells.push(<rect key={'f' + i} x={px - 0.2} y={py - 0.2} width={s + 0.4} height={s + 0.4} fill="#f4f1ea" />);
-      if (k !== '2') continue;
-      if (depth[i] >= 2) {
-        cells.push(
-          <g key={'x' + i} stroke="#e9a92c" strokeWidth={1.7} strokeLinecap="round">
-            <line x1={px + 1.3} y1={py + 1.3} x2={px + s - 1.3} y2={py + s - 1.3} />
-            <line x1={px + s - 1.3} y1={py + 1.3} x2={px + 1.3} y2={py + s - 1.3} stroke="#f6c35a" />
-          </g>,
-        );
-      } else {
-        cells.push(<rect key={'h' + i} x={px + 1.6} y={py + 1.6} width={s - 3.2} height={s - 3.2} rx={0.6} fill="#8a8170" />);
-      }
-    }
-  }
-  return <svg viewBox={`-3 -3 ${cols * s + 6} ${rows * s + 6}`}>{cells}</svg>;
+/** What the site does, in plain words: each tile says one thing you can do and takes you there. */
+const FEATURES: { icon: string; title: () => string; text: () => string; href: string; go: () => string; tag?: () => string }[] = [
+  {
+    icon: 'image', href: '#/quick',
+    title: () => t('สร้างลายจากรูป', 'Turn a photo into a pattern'),
+    text: () => t('ใส่รูปที่ชอบ เลือกผ้าหรือชิ้นงาน แล้วเลือกแบบที่ชอบ ได้ลายพร้อมปักใน 3 ขั้นตอน', 'Add a photo, pick fabric or a piece, choose the result you like: ready to stitch in 3 steps.'),
+    go: () => t('เริ่มเลย', 'Start'),
+    tag: () => t('แนะนำสำหรับมือใหม่', 'Best for beginners'),
+  },
+  {
+    icon: 'grid', href: '#/new/free',
+    title: () => t('ออกแบบลายเองทีละช่อง', 'Design your own, cell by cell'),
+    text: () => t('วาดลายบนตาราง เลือกสีด้าย DMC กำหนดขนาดเอง เหมาะกับผ้า Aida', 'Draw on a grid with DMC thread colors at the size you want. Great for Aida fabric.'),
+    go: () => t('เริ่มออกแบบ', 'Start designing'),
+  },
+  {
+    icon: 'cube', href: '#/new/template',
+    title: () => t('ปักบนชิ้นงานพิมพ์ 3D', 'Stitch on 3D-printed pieces'),
+    text: () => t('เลือกแม่แบบที่มีรูให้ปัก เช่น พวงกุญแจ ที่คั่นหนังสือ ฝากล่อง หรือนำเข้าไฟล์ STL ของคุณ', 'Pick a piece with stitch holes, like a keychain, bookmark or box lid, or import your own STL file.'),
+    go: () => t('เลือกแม่แบบ', 'Choose a template'),
+  },
+  {
+    icon: 'needle', href: '#/guide/stitch',
+    title: () => t('ปักตามลาย ไม่หลง', 'Stitch along without losing your place'),
+    text: () => t('โหมดปักให้ติ๊กช่องที่ปักแล้ว จำว่าค้างไว้ตรงไหน เปิดบนมือถือวางข้างงานปักได้', 'Stitch mode ticks off what you’ve stitched and remembers where you stopped. Prop your phone next to your work.'),
+    go: () => t('ดูวิธีใช้', 'How it works'),
+  },
+  {
+    icon: 'print', href: '#/guide/export',
+    title: () => t('พิมพ์แผนผังและรายการด้าย', 'Print the chart and thread list'),
+    text: () => t('พิมพ์ลายพร้อมสัญลักษณ์สี และรู้ว่าต้องใช้ด้ายสีไหน กี่ช่อง', 'Print the chart with color symbols and see which threads you need, and how much.'),
+    go: () => t('ดูวิธีใช้', 'How it works'),
+  },
+  {
+    icon: 'people', href: '#/community',
+    title: () => t('ลายจากชุมชน และสั่งทำ', 'Community patterns, and having one made'),
+    text: () => t('เลือกลายที่คนอื่นแชร์มาปัก แชร์ลายของคุณ หรือสั่งร้านทำชิ้นงานให้', 'Stitch a pattern someone shared, share your own, or order a shop to make it for you.'),
+    go: () => t('ดูลายจากชุมชน', 'Browse patterns'),
+  },
+];
+
+function Features() {
+  return (
+    <section className="features" aria-labelledby="features-title">
+      <h2 id="features-title">{t('ทำอะไรได้บ้าง', 'What you can do here')}</h2>
+      <div className="feature-grid">
+        {FEATURES.map((f) => (
+          <a key={f.href} className="feature-card" href={f.href}>
+            <span className="feature-ico" aria-hidden="true"><Icon name={f.icon} size={22} /></span>
+            <span className="feature-text">
+              {f.tag && <span className="feature-tag">{f.tag()}</span>}
+              <b>{f.title()}</b>
+              <span>{f.text()}</span>
+              <span className="feature-go">{f.go()} →</span>
+            </span>
+          </a>
+        ))}
+      </div>
+    </section>
+  );
 }
 
 /** Patterns with stitching started but not finished, most recently touched first. */
@@ -191,49 +202,22 @@ export function Home() {
 
       <section className="hero">
         <div className="hero-text">
-          <h1>{t(<>ออกแบบลายปัก<br />สำหรับผ้าและชิ้นงานพิมพ์&nbsp;3&nbsp;มิติ</>, <>Design stitch patterns<br />for fabric and 3D prints</>)}</h1>
-          <p>{t('เติมสีลงในช่อง วางแผนด้าย เข็ม และขนาดชิ้นงาน แล้วพิมพ์แผนผังหรือแชร์ให้เพื่อนได้ในคลิกเดียว', 'Fill in the cells, plan your threads, needle and finished size, then print the chart or share it with a friend in one click.')}</p>
+          <h1>{t(<>ทำลายปักครอสติช<br />ของคุณเอง</>, <>Make your own<br />cross-stitch patterns</>)}</h1>
+          <p>{t('เปลี่ยนรูปเป็นลายปัก ออกแบบเองทีละช่อง หรือเลือกลายที่คนอื่นแชร์ แล้วปักบนผ้าหรือชิ้นงานพิมพ์ 3D ได้เลย ใช้ฟรี ไม่ต้องสมัคร',
+            'Turn a photo into a pattern, design one cell by cell, or pick one someone shared, then stitch it on fabric or a 3D-printed piece. Free, no sign-up.')}</p>
+          <div className="btn-row hero-actions">
+            <a className="btn primary" href="#/quick"><Icon name="image" size={16} /> {t('สร้างลายจากรูป', 'Pattern from a photo')}</a>
+            <a className="btn" href="#/community"><Icon name="people" size={16} /> {t('ดูลายจากชุมชน', 'Browse patterns')}</a>
+          </div>
         </div>
         <HeroStitch />
       </section>
 
+      <Features />
+
       <SeasonBanner />
 
-      <section className="quick-start">
-        <a className="quick-card" href="#/quick">
-          <div className="quick-art" aria-hidden="true">
-            <span className="qa-photo"><Icon name="image" size={30} /></span>
-            <span className="qa-arrow">→</span>
-            <span className="qa-grid">{Array.from({ length: 25 }, (_, i) => <i key={i} style={{ background: [6, 7, 8, 11, 12, 13, 16, 17, 18, 2, 22].includes(i) ? (i === 12 ? '#f2b33d' : '#c72b3b') : undefined }} />)}</span>
-          </div>
-          <div className="quick-text">
-            <span className="quick-badge">{t('แนะนำสำหรับมือใหม่', 'Best for beginners')}</span>
-            <h3>{t('สร้างลายจากรูป', 'Pattern from a photo')}</h3>
-            <p>{t('เลือกผ้าหรือโมเดล ใส่รูป แล้วเลือกแบบที่ชอบ ได้ลายพร้อมปักใน 3 ขั้นตอน', 'Pick fabric or a model, add a photo, choose the result you like: a ready-to-stitch pattern in 3 steps.')}</p>
-            <span className="btn primary">{t('เริ่มเลย →', 'Start →')}</span>
-          </div>
-        </a>
-      </section>
 
-      <h2 className="advanced-head">{t('โหมดขั้นสูง', 'Advanced')} <small>{t('ออกแบบเองทุกช่อง', 'design every cell yourself')}</small></h2>
-      <section className="mode-cards">
-        <a className="mode-card" href="#/new/free">
-          <div className="mode-art free" aria-hidden="true">
-            {Array.from({ length: 48 }, (_, i) => <i key={i} style={{ background: [3, 4, 10, 11, 12, 13, 17, 18, 19, 20, 21, 22, 25, 26, 27, 28, 29, 30, 34, 35, 36, 37, 43, 44].includes(i) ? '#c72b3b' : undefined }} />)}
-          </div>
-          <h3>{t('ออกแบบอิสระ', 'Free design')}</h3>
-          <p>{t('กำหนดขนาดตารางเอง เหมาะกับผ้า Aida หรือวางแผนลายก่อนเลือกชิ้นงาน', 'Set your own grid size. Great for Aida fabric, or for planning a pattern before you pick a piece.')}</p>
-          <span className="go">{t('เริ่มออกแบบ →', 'Start designing →')}</span>
-        </a>
-        <a className="mode-card" href="#/new/template">
-          <div className="mode-art tpl" aria-hidden="true">
-            <TemplateArt />
-          </div>
-          <h3>{t('ใช้โมเดลแม่แบบ', 'Use a template')}</h3>
-          <p>{t('เลือกชิ้นงานพิมพ์ 3D ที่มีรูให้ปัก (พวงกุญแจ ที่คั่นหนังสือ ที่รองแก้ว) หรือนำเข้าไฟล์ STL ของคุณ', 'Pick a 3D-printed piece with stitch holes (keychain, bookmark, coaster) or import your own STL file.')}</p>
-          <span className="go">{t('เลือกแม่แบบ →', 'Choose a template →')}</span>
-        </a>
-      </section>
 
       <CommunityPreview />
 
