@@ -373,6 +373,6 @@
 .acct-handle { position: relative; display: block; }
 .acct-handle i { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); font-style: normal; color: var(--ink-3); font-size: 15px; pointer-events: none; }
 .fb-field .acct-handle input { padding-left: 28px; }
-.acct-profile .small { margin: 2px 0 6px; }
+.acct-public .small { margin: 2px 0 6px; }
 @media (max-width: 600px) { .acct-profile-fields { grid-template-columns: 1fr; } }
 .publish-handle { color: var(--ink-3); font-size: 12.5px; }

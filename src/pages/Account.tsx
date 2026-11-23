@@ -429,7 +429,7 @@ function PublicProfileCard() {
   if (creator === undefined) return null;
   const lockedText = locked && locked.toLocaleDateString(locale, { day: 'numeric', month: 'short', year: 'numeric' });
   return (
-    <section className="acct-card acct-profile">
+    <section className="acct-card acct-public">
       <h3><Icon name="people" size={18} /> {t('โปรไฟล์สาธารณะ', 'Public profile')}</h3>
       {creator ? (
         <p className="acct-profile-line">
