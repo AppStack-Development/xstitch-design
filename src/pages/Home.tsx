@@ -11,6 +11,7 @@ import { FeedbackLink } from '../components/FeedbackDialog';
 import { communityEnabled, listPosts, myLikes, type Post } from '../lib/community';
 import { useCloud } from '../lib/cloud';
 import { PostCard } from '../components/PostCard';
+import { FeatureArt, type FeatureArtKind } from '../components/FeatureArt';
 import { APP_NAME } from '../lib/brand';
 import { Thumb } from '../components/Thumb';
 import { listPatterns } from '../lib/storage';
@@ -19,40 +20,40 @@ import { PATTERNS_PULLED } from '../lib/sync';
 import type { Pattern } from '../types';
 
 /** What the site does, in plain words: each tile says one thing you can do and takes you there. */
-const FEATURES: { icon: string; title: () => string; text: () => string; href: string; go: () => string; tag?: () => string }[] = [
+const FEATURES: { art: FeatureArtKind; title: () => string; text: () => string; href: string; go: () => string; tag?: () => string }[] = [
   {
-    icon: 'image', href: '#/quick',
+    art: 'photo', href: '#/quick',
     title: () => t('สร้างลายจากรูป', 'Turn a photo into a pattern'),
     text: () => t('ใส่รูปที่ชอบ เลือกผ้าหรือชิ้นงาน แล้วเลือกแบบที่ชอบ ได้ลายพร้อมปักใน 3 ขั้นตอน', 'Add a photo, pick fabric or a piece, choose the result you like: ready to stitch in 3 steps.'),
     go: () => t('เริ่มเลย', 'Start'),
     tag: () => t('แนะนำสำหรับมือใหม่', 'Best for beginners'),
   },
   {
-    icon: 'grid', href: '#/new/free',
+    art: 'design', href: '#/new/free',
     title: () => t('ออกแบบลายเองทีละช่อง', 'Design your own, cell by cell'),
     text: () => t('วาดลายบนตาราง เลือกสีด้าย DMC กำหนดขนาดเอง เหมาะกับผ้า Aida', 'Draw on a grid with DMC thread colors at the size you want. Great for Aida fabric.'),
     go: () => t('เริ่มออกแบบ', 'Start designing'),
   },
   {
-    icon: 'cube', href: '#/new/template',
+    art: 'print3d', href: '#/new/template',
     title: () => t('ปักบนชิ้นงานพิมพ์ 3D', 'Stitch on 3D-printed pieces'),
     text: () => t('เลือกแม่แบบที่มีรูให้ปัก เช่น พวงกุญแจ ที่คั่นหนังสือ ฝากล่อง หรือนำเข้าไฟล์ STL ของคุณ', 'Pick a piece with stitch holes, like a keychain, bookmark or box lid, or import your own STL file.'),
     go: () => t('เลือกแม่แบบ', 'Choose a template'),
   },
   {
-    icon: 'needle', href: '#/guide/stitch',
+    art: 'stitch', href: '#/guide/stitch',
     title: () => t('ปักตามลาย ไม่หลง', 'Stitch along without losing your place'),
     text: () => t('โหมดปักให้ติ๊กช่องที่ปักแล้ว จำว่าค้างไว้ตรงไหน เปิดบนมือถือวางข้างงานปักได้', 'Stitch mode ticks off what you’ve stitched and remembers where you stopped. Prop your phone next to your work.'),
     go: () => t('ดูวิธีใช้', 'How it works'),
   },
   {
-    icon: 'print', href: '#/guide/export',
+    art: 'chart', href: '#/guide/export',
     title: () => t('พิมพ์แผนผังและรายการด้าย', 'Print the chart and thread list'),
     text: () => t('พิมพ์ลายพร้อมสัญลักษณ์สี และรู้ว่าต้องใช้ด้ายสีไหน กี่ช่อง', 'Print the chart with color symbols and see which threads you need, and how much.'),
     go: () => t('ดูวิธีใช้', 'How it works'),
   },
   {
-    icon: 'people', href: '#/community',
+    art: 'community', href: '#/community',
     title: () => t('ลายจากชุมชน และสั่งทำ', 'Community patterns, and having one made'),
     text: () => t('เลือกลายที่คนอื่นแชร์มาปัก แชร์ลายของคุณ หรือสั่งร้านทำชิ้นงานให้', 'Stitch a pattern someone shared, share your own, or order a shop to make it for you.'),
     go: () => t('ดูลายจากชุมชน', 'Browse patterns'),
@@ -66,9 +67,11 @@ function Features() {
       <div className="feature-grid">
         {FEATURES.map((f) => (
           <a key={f.href} className="feature-card" href={f.href}>
-            <span className="feature-ico" aria-hidden="true"><Icon name={f.icon} size={22} /></span>
-            <span className="feature-text">
+            <span className="feature-art">
+              <FeatureArt kind={f.art} />
               {f.tag && <span className="feature-tag">{f.tag()}</span>}
+            </span>
+            <span className="feature-text">
               <b>{f.title()}</b>
               <span>{f.text()}</span>
               <span className="feature-go">{f.go()} →</span>
@@ -198,7 +201,7 @@ export function Home() {
           <button className="icon-btn sm" onClick={() => setIosHelp(false)} title={t('ปิด', 'Close')}><Icon name="close" size={16} /></button>
         </div>
       )}
-      <ContinueStitching />
+      <SeasonBanner />
 
       <section className="hero">
         <div className="hero-text">
@@ -215,11 +218,11 @@ export function Home() {
 
       <Features />
 
-      <SeasonBanner />
-
 
 
       <CommunityPreview />
+
+      <ContinueStitching />
 
       <footer className="site-foot">
         <span>{APP_NAME} · AppStack Development</span>
