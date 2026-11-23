@@ -188,3 +188,4 @@
 @media (max-width: 600px) { .my-patterns-tabs .seg { width: 100%; } .my-patterns-tabs .seg button { flex: 1; } }
 /* cards in a row keep their buttons on one line, whatever the text above */
 .my-patterns .card-body { flex: 1; }
+.my-patterns-more { margin-top: 18px; }

@@ -28,6 +28,8 @@ const colorCount = (n: number) => t(`${n} สี`, `${n} ${n === 1 ? 'color' : '
 const shortDate = (ms: number) => new Date(ms).toLocaleDateString(locale, { day: 'numeric', month: 'short', year: '2-digit' });
 
 type Filter = 'all' | 'working' | 'shared';
+/** cards shown at first, and added by each "ดูเพิ่ม" */
+const PAGE = 12;
 /** one card: a pattern in this browser (maybe shared), or a shared post with no copy here */
 type Entry = { key: string; at: number; p: Pattern | null; post: Post | null; shared: boolean };
 
@@ -43,6 +45,7 @@ export function MyPatterns() {
   /** your posts; null while loading or when signed out */
   const [posts, setPosts] = useState<Post[] | null>(null);
   const [filter, setFilter] = useState<Filter>('all');
+  const [limit, setLimit] = useState(PAGE);
   const [busy, setBusy] = useState<string | null>(null);
   const [err, setErr] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
@@ -170,7 +173,7 @@ export function MyPatterns() {
         <div className="my-patterns-tabs">
           <div className="seg" role="tablist" aria-label={t('แสดงลาย', 'Show')}>
             {([['all', t(`ทั้งหมด ${entries.length}`, `All ${entries.length}`)], ['working', t(`ลายที่ทำ ${working}`, `Working on ${working}`)], ['shared', t(`ลายที่แชร์ ${sharedCount}`, `Shared ${sharedCount}`)]] as [Filter, string][]).map(([k, label]) => (
-              <button key={k} role="tab" aria-selected={filter === k} className={filter === k ? 'on' : ''} onClick={() => setFilter(k)}>{label}</button>
+              <button key={k} role="tab" aria-selected={filter === k} className={filter === k ? 'on' : ''} onClick={() => { setFilter(k); setLimit(PAGE); }}>{label}</button>
             ))}
           </div>
           {filter === 'shared' && <p className="hint">{t('อัปเดตลายที่แชร์ได้จากหน้าแก้ไขลาย ด้วยเมนู ส่งออก / แชร์ → แชร์ในชุมชน', 'To update a shared pattern, open it in the editor and use Export / share → Share with the community.')}</p>}
@@ -199,11 +202,18 @@ export function MyPatterns() {
       )}
 
       <div className="gallery">
-        {shown.map((e) => e.p
+        {shown.slice(0, limit).map((e) => e.p
           ? <PatternCard key={e.key} p={e.p} post={e.post} shared={e.shared} signedIn={signedIn} busy={busy === e.post?.id}
               onDuplicate={duplicate} onRemove={remove} onTakeDown={takeDown} />
           : <SharedOnlyCard key={e.key} post={e.post!} busy={busy === e.post!.id} onTakeDown={takeDown} />)}
       </div>
+      {shown.length > limit && (
+        <div className="community-more my-patterns-more">
+          <button className="btn" onClick={() => setLimit((n) => n + PAGE)}>
+            {t(`ดูเพิ่ม (อีก ${shown.length - limit} ลาย)`, `Show more (${shown.length - limit} more)`)}
+          </button>
+        </div>
+      )}
     </section>
   );
 }
