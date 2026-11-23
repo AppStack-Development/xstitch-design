@@ -18,7 +18,7 @@ import { Thumb } from '../components/Thumb';
 import { Icon } from '../components/Icon';
 import { LangSwitch } from '../components/LangSwitch';
 import { AccountButton } from '../components/AccountButton';
-import { LikeButton, TeamBadge, usePostPattern } from '../components/PostCard';
+import { AuthorName, LikeButton, usePostPattern } from '../components/PostCard';
 import { PrintView } from './PrintView';
 import { OrderRequestDialog } from '../components/OrderRequestDialog';
 import { baht, ordersEnabled } from '../lib/orders';
@@ -173,7 +173,7 @@ export function CommunityPost({ id }: { id: string }) {
             </p>
           )}
           <h1>{post.title}</h1>
-          <p className="post-by">{t('โดย', 'by')} <b>{post.author.name}</b>{post.author.official && <TeamBadge />} <span className="muted">· {shared}</span></p>
+          <p className="post-by">{t('โดย', 'by')} <AuthorName author={post.author} at /> <span className="muted">· {shared}</span></p>
           {origin && (
             <p className="post-credit">{t('ดัดแปลงจาก', 'Adapted from')} <a className="acct-link" href={`#/c/${origin.id}`}>{origin.title}</a> {t('โดย', 'by')} {origin.author.name}</p>
           )}

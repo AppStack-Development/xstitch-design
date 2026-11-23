@@ -1,6 +1,6 @@
 import { useEffect, useState, type CSSProperties } from 'react';
 import type { Pattern } from '../types';
-import { postPattern, setLike, type Post } from '../lib/community';
+import { postPattern, profileHref, setLike, type Author, type Post } from '../lib/community';
 import { useCloud } from '../lib/cloud';
 import { DIFFICULTY_LABEL } from '../lib/pattern';
 import { t } from '../lib/i18n';
@@ -24,6 +24,31 @@ export function usePostPattern(post: Post | null): Pattern | null {
 /** "จากทีม" badge for the official XStitch.Design account. */
 export function TeamBadge() {
   return <span className="team-badge">{t('จากทีม', 'Team')}</span>;
+}
+
+/** The verified badge after a name: the team has checked this person (0017). */
+export function VerifiedBadge({ size = 15 }: { size?: number }) {
+  const label = t('ยืนยันตัวตนแล้ว', 'Verified');
+  return (
+    <svg className="verified-badge" width={size} height={size} viewBox="0 0 16 16" role="img" aria-label={label}>
+      <title>{label}</title>
+      <path fill="currentColor" d="M8 .8l1.7 1.3 2.1-.2.7 2 1.9 1-.5 2.1 1 1.9-1.5 1.5-.2 2.1-2.1.5-1.3 1.7-1.9-.9-1.9.9-1.3-1.7-2.1-.5-.2-2.1L.6 8.9l1-1.9-.5-2.1 1.9-1 .7-2 2.1.2z" />
+      <path fill="none" stroke="#fff" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" d="M5.2 8.2l1.9 1.9 3.8-4" />
+    </svg>
+  );
+}
+
+/** "โดย ชื่อ ✓ จากทีม": the author's name links to their profile, badges follow it. */
+export function AuthorName({ author, at }: { author: Author; at?: boolean }) {
+  const name = <b>{author.name}</b>;
+  return (
+    <>
+      {author.username ? <a className="author-link" href={profileHref(author.username)}>{name}</a> : name}
+      {author.verified && <VerifiedBadge />}
+      {author.official && <TeamBadge />}
+      {at && author.username && <span className="author-at">@{author.username}</span>}
+    </>
+  );
 }
 
 /**
@@ -95,7 +120,7 @@ export function PostCard({ post, liked, onLike }: { post: Post; liked: boolean; 
       </a>
       <div className="sample-body">
         <h3><a href={href}>{post.title}</a></h3>
-        <div className="post-by">{t('โดย', 'by')} <b>{post.author.name}</b>{post.author.official && <TeamBadge />}</div>
+        <div className="post-by">{t('โดย', 'by')} <AuthorName author={post.author} /></div>
         <div className="sample-meta">
           <span className={`diff ${post.difficulty}`}>{DIFFICULTY_LABEL[post.difficulty]}</span>
           <span>{t(`${post.colors} สี`, `${post.colors} colors`)}</span>

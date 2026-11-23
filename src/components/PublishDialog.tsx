@@ -114,6 +114,7 @@ function Form({ pattern, canGoBack, onBack, onClose, onDone }: {
   /** the saved public name ('' = none yet) */
   const [savedName, setSavedName] = useState('');
   const [name, setName] = useState('');
+  const [handle, setHandle] = useState('');
   const [existing, setExisting] = useState<Post | null>(null);
   const [replace, setReplace] = useState(true);
   const [title, setTitle] = useState(pattern.name);
@@ -131,6 +132,7 @@ function Form({ pattern, canGoBack, onBack, onClose, onDone }: {
       .then(([creator, post]) => {
         if (!live) return;
         setSavedName(creator?.name ?? '');
+        setHandle(creator?.username ?? '');
         // suggest a first name only; people can change it to a nickname
         setName(creator?.name ?? (cloud.user?.name ?? '').split(/\s+/)[0] ?? '');
         if (post) {
@@ -185,6 +187,9 @@ function Form({ pattern, canGoBack, onBack, onClose, onDone }: {
         <label className="fb-field">
           <span>{t('ชื่อที่แสดง', 'Display name')} <small>{t('คนอื่นจะเห็นชื่อนี้ ใช้ชื่อเล่นหรือนามแฝงได้', 'Others see this; a nickname is fine')}</small></span>
           <input value={name} maxLength={40} onChange={(e) => setName(e.target.value)} disabled={!ready} placeholder={t('เช่น ป้าแดงปักผ้า', 'e.g. Stitchy Sam')} />
+          {ready && <small className="publish-handle">{handle
+            ? t(<>โปรไฟล์ของคุณ <b>@{handle}</b> · เปลี่ยนชื่อผู้ใช้ได้ใน<a href="#/account">หน้าบัญชี</a></>, <>Your profile: <b>@{handle}</b> · change your username on the <a href="#/account">account page</a></>)
+            : t(<>ระบบจะตั้งชื่อผู้ใช้ให้ เปลี่ยนเป็นของคุณได้ใน<a href="#/account">หน้าบัญชี</a></>, <>You’ll get a username; choose your own on the <a href="#/account">account page</a></>)}</small>}
         </label>
         <label className="fb-field">
           <span>{t('ชื่อลาย', 'Pattern title')}</span>

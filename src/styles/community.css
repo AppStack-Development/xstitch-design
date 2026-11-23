@@ -87,9 +87,6 @@
 .report-reasons { display: flex; flex-direction: column; gap: 10px; }
 
 /* account page: patterns I've shared */
-.acct-name-row { display: flex; align-items: flex-end; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
-.acct-name-row .fb-field { flex: 1 1 220px; }
-.acct-name-row .btn { height: var(--ctl); flex-shrink: 0; }
 .shared-list { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: column; }
 .shared-list li { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-top: 1px solid var(--line); }
 .shared-list li .btn { flex-shrink: 0; }
@@ -359,3 +356,23 @@
 .order-quote-head { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 10px 12px; border-radius: 12px; background: var(--bg); }
 .order-quote-head p { margin: 0; font-size: 14px; line-height: 1.5; }
 .shop-quote-pick { display: flex; flex-wrap: wrap; gap: 6px 18px; }
+
+/* @usernames, the verified badge and profile pages (migration 0017, pages/CreatorProfile.tsx) */
+.verified-badge { flex-shrink: 0; color: #2f6fd6; vertical-align: -2px; }
+.author-link { color: inherit; text-decoration: none; min-width: 0; }
+.author-link:hover b { text-decoration: underline; }
+.author-at { color: var(--ink-3); font-size: 12.5px; }
+.creator-hero h1 { gap: 6px 8px; }
+.creator-hero .creator-at { color: var(--ink-2); font-size: 14px; }
+.creator-verified-note { display: flex; align-items: center; gap: 5px; color: #2f6fd6; font-weight: 600; }
+.creator-actions { margin-top: 12px; flex-wrap: wrap; }
+.creator-posts h3 { margin: 6px 0 12px; }
+.acct-profile-line { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 6px; margin: 0 0 4px; }
+.acct-profile-line b { overflow-wrap: anywhere; }
+.acct-profile-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin: 10px 0 6px; }
+.acct-handle { position: relative; display: block; }
+.acct-handle i { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); font-style: normal; color: var(--ink-3); font-size: 15px; pointer-events: none; }
+.fb-field .acct-handle input { padding-left: 28px; }
+.acct-profile .small { margin: 2px 0 6px; }
+@media (max-width: 600px) { .acct-profile-fields { grid-template-columns: 1fr; } }
+.publish-handle { color: var(--ink-3); font-size: 12.5px; }

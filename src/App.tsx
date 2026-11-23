@@ -34,6 +34,7 @@ const OrderTerms = lazy(() => import('./pages/OrderTerms').then((m) => ({ defaul
 const ShopPage = lazy(() => import('./pages/ShopPage').then((m) => ({ default: m.ShopPage })));
 const SellerTerms = lazy(() => import('./pages/SellerTerms').then((m) => ({ default: m.SellerTerms })));
 const ShopProfile = lazy(() => import('./pages/ShopProfile').then((m) => ({ default: m.ShopProfile })));
+const CreatorProfile = lazy(() => import('./pages/CreatorProfile').then((m) => ({ default: m.CreatorProfile })));
 
 const LIKELY_NEXT = [() => import('./pages/Editor'), () => import('./pages/StitchMode'), () => import('./pages/QuickCreate')];
 function prefetchLikelyPages() {
@@ -108,6 +109,7 @@ function Routes() {
   if (route === 'order-terms') return <OrderTerms />;
   if (route === 'seller-terms') return <SellerTerms />;
   if (route === 'shops' && arg && /^\d+$/.test(arg)) return <ShopProfile key={arg} id={Number(arg)} />;
+  if (route && route.length > 1 && route.startsWith('@')) return <CreatorProfile key={route} username={decodeURIComponent(route.slice(1))} />;
   if (route === 'community') return <Community key={arg ?? ''} tag={arg} />;
   if (route === 'moderation') return <Moderation key={arg ?? ''} startTab={arg === 'orders' ? 'orders' : arg === 'shops' ? 'shops' : undefined} />;
   if (route === 'order' && arg) return <OrderPage key={arg} code={arg} />;

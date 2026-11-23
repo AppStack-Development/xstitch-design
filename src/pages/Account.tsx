@@ -12,7 +12,8 @@ import { navigate } from '../App';
 import { FeedbackLink } from '../components/FeedbackDialog';
 import { detectInApp, externalUrl, canOpenExternally, type InAppInfo } from '../lib/inAppBrowser';
 import { trackStep } from '../lib/analytics';
-import { communityEnabled, getMyCreator, myPosts, saveMyCreator, unpublish, type Post } from '../lib/community';
+import { USERNAME_DAYS, cleanUsername, communityEnabled, getMyCreator, myPosts, profileHref, saveMyCreator, unpublish, usernameProblem, usernameTaken, type Creator, type Post } from '../lib/community';
+import { VerifiedBadge } from '../components/PostCard';
 import { amModerator, openPostCount } from '../lib/moderation';
 import { useStash } from '../lib/stash';
 import { DMC_LIBRARY } from '../lib/threads';
@@ -365,40 +366,129 @@ function MyShopCard() {
   );
 }
 
-/** "ลายที่ฉันแชร์": your public name and the patterns you shared to the community. */
+/**
+ * "โปรไฟล์สาธารณะ": the name people see in the community, your @username (the address of your profile page,
+ * #/@username) and whether the team has verified you. Anyone signed in can set it up, before sharing anything.
+ */
+function PublicProfileCard() {
+  const [creator, setCreator] = useState<Creator | null | undefined>(undefined);
+  const [name, setName] = useState('');
+  const [handle, setHandle] = useState('');
+  const [taken, setTaken] = useState<boolean | null>(null);
+  const [state, setState] = useState<'idle' | 'saving' | 'saved'>('idle');
+  const [err, setErr] = useState('');
+
+  useEffect(() => {
+    let live = true;
+    getMyCreator()
+      .then((c) => { if (!live) return; setCreator(c); setName(c?.name ?? ''); setHandle(c?.username ?? ''); })
+      .catch((e) => { if (live) { setErr(errText(e)); setCreator(null); } });
+    return () => { live = false; };
+  }, []);
+
+  const wanted = cleanUsername(handle);
+  const handleChanged = !!wanted && wanted !== creator?.username;
+  const problem = handleChanged ? usernameProblem(wanted) : null;
+  // is it free? (asked a moment after typing stops; the database still has the last word)
+  useEffect(() => {
+    setTaken(null);
+    if (!handleChanged || problem) return;
+    let live = true;
+    const timer = setTimeout(() => {
+      usernameTaken(wanted).then((x) => { if (live) setTaken(x); }).catch(() => { /* checked again on save */ });
+    }, 400);
+    return () => { live = false; clearTimeout(timer); };
+  }, [wanted, handleChanged, problem]);
+
+  const locked = creator?.usernameLockedUntil ?? null;
+  const nameChanged = name.trim() !== (creator?.name ?? '');
+  const canSave = !!name.trim() && (nameChanged || handleChanged) && !problem && taken !== true && state !== 'saving';
+
+  const save = async () => {
+    if (handleChanged && creator && !(await askConfirm({
+      title: t(`เปลี่ยนชื่อผู้ใช้เป็น @${wanted}?`, `Change your username to @${wanted}?`),
+      message: <p>{t(<>ลิงก์โปรไฟล์เดิม <b>@{creator.username}</b> จะใช้ไม่ได้ และเปลี่ยนชื่อผู้ใช้ได้อีกครั้งหลัง {USERNAME_DAYS} วัน</>,
+        <>Links to <b>@{creator.username}</b> stop working, and you can change it again after {USERNAME_DAYS} days.</>)}</p>,
+      ok: t('เปลี่ยนชื่อผู้ใช้', 'Change username'),
+      icon: 'people',
+    }))) return;
+    setState('saving');
+    setErr('');
+    try {
+      const c = await saveMyCreator(name, handleChanged ? wanted : undefined);
+      setCreator(c);
+      setName(c.name);
+      setHandle(c.username);
+      setState('saved');
+    } catch (e) {
+      setErr(errText(e));
+      setState('idle');
+    }
+  };
+
+  if (creator === undefined) return null;
+  const lockedText = locked && locked.toLocaleDateString(locale, { day: 'numeric', month: 'short', year: 'numeric' });
+  return (
+    <section className="acct-card acct-profile">
+      <h3><Icon name="people" size={18} /> {t('โปรไฟล์สาธารณะ', 'Public profile')}</h3>
+      {creator ? (
+        <p className="acct-profile-line">
+          <b>{creator.name}</b>{creator.verified && <VerifiedBadge />}
+          <a className="acct-link" href={profileHref(creator.username)}>@{creator.username}</a>
+          <span className="muted">· {creator.verified ? t('ทีมงานยืนยันตัวตนแล้ว', 'Verified by the team') : t('ยังไม่ได้ยืนยันตัวตน', 'Not verified')}</span>
+        </p>
+      ) : (
+        <p className="muted">{t('ตั้งชื่อที่คนอื่นเห็นในชุมชน และชื่อผู้ใช้สำหรับหน้าโปรไฟล์ของคุณ ชื่อบัญชี Google จะไม่ถูกแสดง',
+          'Choose the name people see in the community and a username for your profile page. Your Google name is never shown.')}</p>
+      )}
+      <div className="acct-profile-fields">
+        <label className="fb-field">
+          <span>{t('ชื่อที่แสดง', 'Display name')} <small>{t('ไทยหรืออังกฤษ ไม่เกิน 40 ตัว', 'any language, up to 40')}</small></span>
+          <input value={name} maxLength={40} onChange={(e) => { setName(e.target.value); setState('idle'); }} placeholder={t('เช่น ร้านปักสุขใจ', 'e.g. Happy Stitches')} />
+        </label>
+        <label className="fb-field">
+          <span>{t('ชื่อผู้ใช้', 'Username')} <small>{t('a–z 0–9 _ . 3–20 ตัว', 'a–z 0–9 _ . 3–20 chars')}</small></span>
+          <span className="acct-handle">
+            <i aria-hidden="true">@</i>
+            <input value={handle} maxLength={21} disabled={!!locked} autoCapitalize="none" autoCorrect="off" spellCheck={false}
+              placeholder={creator ? '' : t('เว้นว่างได้ ระบบจะตั้งให้', 'leave empty to get one')}
+              onChange={(e) => { setHandle(e.target.value.toLowerCase().replace(/\s/g, '')); setState('idle'); }} />
+          </span>
+        </label>
+      </div>
+      {problem && <p className="error small">{problem}</p>}
+      {!problem && handleChanged && taken === true && <p className="error small">{t('มีคนใช้ชื่อผู้ใช้นี้แล้ว ลองชื่ออื่น', 'That username is taken. Try another.')}</p>}
+      {!problem && handleChanged && taken === false && <p className="ok small">{t(`@${wanted} ว่าง ใช้ได้`, `@${wanted} is free`)}</p>}
+      {locked
+        ? <p className="hint">{t(`เปลี่ยนชื่อผู้ใช้ได้อีกครั้งวันที่ ${lockedText}`, `You can change your username again on ${lockedText}.`)}</p>
+        : creator && !creator.usernameChosen
+          ? <p className="hint">{t(`@${creator.username} เป็นชื่อที่ระบบตั้งให้ เปลี่ยนเป็นชื่อของคุณได้เลย หลังจากนั้นเปลี่ยนได้ ${USERNAME_DAYS} วันครั้ง`, `@${creator.username} was picked for you. Change it to your own now; after that you can change it once every ${USERNAME_DAYS} days.`)}</p>
+          : <p className="hint">{t(`ชื่อผู้ใช้เป็นที่อยู่หน้าโปรไฟล์ของคุณ เปลี่ยนได้ ${USERNAME_DAYS} วันครั้ง`, `Your username is the address of your profile page. You can change it once every ${USERNAME_DAYS} days.`)}</p>}
+      {err && <p className="error small">{err}</p>}
+      <div className="btn-row">
+        <button className="btn primary" onClick={save} disabled={!canSave}>
+          {state === 'saving' ? t('กำลังบันทึก…', 'Saving…') : state === 'saved' && !nameChanged && !handleChanged ? t('บันทึกแล้ว', 'Saved') : creator ? t('บันทึก', 'Save') : t('สร้างโปรไฟล์', 'Create profile')}
+        </button>
+        {creator && <a className="btn" href={profileHref(creator.username)}>{t('ดูหน้าโปรไฟล์', 'View profile')}</a>}
+      </div>
+      {creator && !creator.verified && <p className="hint">{t('เครื่องหมาย ✓ หลังชื่อ ทีมงานให้กับนักออกแบบและร้านที่ตรวจสอบแล้ว', 'The ✓ badge after a name is given by the team to designers and shops it has checked.')}</p>}
+    </section>
+  );
+}
+
+/** "ลายที่ฉันแชร์": the patterns you shared to the community. */
 function MyShared() {
   const [posts, setPosts] = useState<Post[] | null>(null);
-  const [savedName, setSavedName] = useState<string | null>(null);
-  const [name, setName] = useState('');
-  const [nameState, setNameState] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [busy, setBusy] = useState<string | null>(null);
   const [err, setErr] = useState('');
 
   useEffect(() => {
     let live = true;
-    Promise.all([myPosts(), getMyCreator()])
-      .then(([ps, creator]) => {
-        if (!live) return;
-        setPosts(ps);
-        setSavedName(creator?.name ?? null);
-        setName(creator?.name ?? '');
-      })
+    myPosts()
+      .then((ps) => { if (live) setPosts(ps); })
       .catch((e) => { if (live) { setErr(errText(e)); setPosts([]); } });
     return () => { live = false; };
   }, []);
-
-  const saveName = async () => {
-    setNameState('saving');
-    setErr('');
-    try {
-      await saveMyCreator(name);
-      setSavedName(name.trim());
-      setNameState('saved');
-    } catch (e) {
-      setErr(errText(e));
-      setNameState('idle');
-    }
-  };
   const takeDown = async (post: Post) => {
     if (!(await askConfirm({
       title: t('ถอนลายออกจากชุมชน?', 'Take it down?'),
@@ -423,17 +513,6 @@ function MyShared() {
   return (
     <section className="acct-card acct-shared">
       <h3><Icon name="people" size={18} /> {t('ลายที่ฉันแชร์', 'Patterns I’ve shared')}</h3>
-      {savedName !== null && (
-        <div className="acct-name-row">
-          <label className="fb-field">
-            <span>{t('ชื่อที่แสดงในชุมชน', 'Display name in the community')}</span>
-            <input value={name} maxLength={40} onChange={(e) => { setName(e.target.value); setNameState('idle'); }} />
-          </label>
-          <button className="btn" onClick={saveName} disabled={!name.trim() || name.trim() === savedName || nameState === 'saving'}>
-            {nameState === 'saving' ? t('กำลังบันทึก…', 'Saving…') : nameState === 'saved' ? t('บันทึกแล้ว', 'Saved') : t('บันทึกชื่อ', 'Save name')}
-          </button>
-        </div>
-      )}
       {posts === null && <StitchLoader small label={t('กำลังโหลด…', 'Loading…')} />}
       {posts && !posts.length && (
         <p className="muted">{t(<>ยังไม่ได้แชร์ลาย เปิดลายในหน้าแก้ไข แล้วกด <b>ส่งออก / แชร์ → แชร์ในชุมชน</b> · <a className="acct-link" href="#/community">ดูลายจากชุมชน</a></>,
@@ -539,6 +618,7 @@ function SignedIn() {
         <p className="hint">{t('ลายและรายการด้ายจะซิงก์ให้อัตโนมัติเมื่อมีการเปลี่ยนแปลง', 'Patterns and your thread list sync automatically when they change.')}</p>
       </section>
 
+      {communityEnabled && <PublicProfileCard />}
       {communityEnabled && <ModeratorCard />}
       {ordersEnabled && <MyShopCard />}
       {communityEnabled && <MyShared />}

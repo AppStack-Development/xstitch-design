@@ -54,10 +54,13 @@ export interface Post {
   likeCount: number;
   createdAt: string;
   updatedAt: string;
-  author: { id: string; name: string; official: boolean };
+  author: Author;
 }
 
-const COLUMNS = 'id, title, description, base, difficulty, colors, stitches, cols, rows, template_name, tags, data, remix_of, status, like_count, created_at, updated_at, author, allow_making, creators(display_name, official), post_prices(price_thb)';
+/** Who shared a post: display name, @username (their profile is #/@username) and badges. */
+export interface Author { id: string; name: string; username: string; official: boolean; verified: boolean }
+
+const COLUMNS = 'id, title, description, base, difficulty, colors, stitches, cols, rows, template_name, tags, data, remix_of, status, like_count, created_at, updated_at, author, allow_making, creators(display_name, username, official, verified), post_prices(price_thb)';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function toPost(r: any): Post {
@@ -67,8 +70,13 @@ function toPost(r: any): Post {
     tags: r.tags ?? [], data: r.data, remixOf: r.remix_of, status: r.status, likeCount: r.like_count,
     createdAt: r.created_at, updatedAt: r.updated_at, allowMaking: !!r.allow_making,
     forSaleFrom: r.post_prices?.length ? Math.min(...r.post_prices.map((x: { price_thb: number }) => x.price_thb)) : null,
-    author: { id: r.author, name: r.creators?.display_name ?? t('ไม่ระบุชื่อ', 'Unknown'), official: !!r.creators?.official },
+    author: toAuthor(r.author, r.creators),
   };
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function toAuthor(id: string, c: any): Author {
+  return { id, name: c?.display_name ?? t('ไม่ระบุชื่อ', 'Unknown'), username: c?.username ?? '', official: !!c?.official, verified: !!c?.verified };
 }
 
 /** Turn database / network errors into something a person can act on. */
@@ -77,6 +85,12 @@ function friendly(e: unknown): Error {
   if (navigator.onLine === false || /Failed to fetch|NetworkError|Load failed/i.test(msg)) {
     return new Error(t('ไม่มีอินเทอร์เน็ต ลองใหม่เมื่อออนไลน์', 'You’re offline. Try again when you’re online.'));
   }
+  if (/creators_username_format/.test(msg)) return new Error(USERNAME_RULE());
+  if (/creators_username/.test(msg)) return new Error(t('มีคนใช้ชื่อผู้ใช้นี้แล้ว ลองชื่ออื่น', 'That username is taken. Try another.'));
+  if (/username not allowed/i.test(msg)) return new Error(t('ชื่อผู้ใช้นี้สงวนไว้ ลองชื่ออื่น', 'That username is reserved. Try another.'));
+  if (/username changed recently/i.test(msg)) return new Error(t('เปลี่ยนชื่อผู้ใช้ได้ 30 วันครั้ง', 'You can change your username once every 30 days.'));
+  if (/name not allowed/i.test(msg)) return new Error(t('ชื่อนี้คล้ายชื่อทีม XStitch.Design ลองชื่ออื่น', 'That name looks like the XStitch.Design team. Try another.'));
+  if (/no such creator/i.test(msg)) return new Error(t('ไม่พบผู้ใช้นี้', 'No such user'));
   if (/share limit/i.test(msg)) return new Error(t('วันนี้แชร์ครบ 10 ลายแล้ว พรุ่งนี้แชร์ต่อได้', 'You’ve shared 10 patterns today. You can share more tomorrow.'));
   return new Error(msg);
 }
@@ -91,7 +105,7 @@ async function run<T>(fn: () => PromiseLike<{ data: T; error: unknown }>): Promi
 const PAGE = 24;
 
 /** One page of published posts. */
-export async function listPosts(opts: { base?: PostBase; tag?: string; sort?: PostSort; page?: number; limit?: number } = {}): Promise<{ posts: Post[]; more: boolean }> {
+export async function listPosts(opts: { base?: PostBase; tag?: string; sort?: PostSort; page?: number; limit?: number; author?: string } = {}): Promise<{ posts: Post[]; more: boolean }> {
   const c = await client();
   const limit = opts.limit ?? PAGE;
   const from = (opts.page ?? 0) * limit;
@@ -99,6 +113,7 @@ export async function listPosts(opts: { base?: PostBase; tag?: string; sort?: Po
     let q = c.from('posts').select(COLUMNS).eq('status', 'published');
     if (opts.base) q = q.eq('base', opts.base);
     if (opts.tag) q = q.contains('tags', [opts.tag]);
+    if (opts.author) q = q.eq('author', opts.author);
     q = opts.sort === 'popular'
       ? q.order('like_count', { ascending: false }).order('created_at', { ascending: false })
       : q.order('created_at', { ascending: false });
@@ -136,26 +151,106 @@ function me() {
   return u;
 }
 
-// ---------- your public name ----------
+// ---------- your public name and @username ----------
 
-export interface Creator { name: string; official: boolean }
+export interface Creator {
+  name: string;
+  username: string;
+  /** false while the username is one we picked (maker1234): changing it is free */
+  usernameChosen: boolean;
+  /** when it can next be changed; null = any time */
+  usernameLockedUntil: Date | null;
+  official: boolean;
+  verified: boolean;
+}
+
+export const USERNAME_DAYS = 30;
+const USERNAME_RE = /^[a-z0-9_][a-z0-9_.]{1,18}[a-z0-9_]$/;
+const USERNAME_RULE = () => t('ชื่อผู้ใช้ใช้ a–z, 0–9, _ และ . ได้ 3–20 ตัว (ห้ามขึ้นต้นหรือลงท้ายด้วยจุด หรือมีจุดติดกัน)',
+  'Usernames use a–z, 0–9, _ and . (3–20 characters, no dot at the start or end, no two dots in a row).');
+const RESERVED = new Set(['admin', 'administrator', 'root', 'system', 'support', 'help', 'helpdesk', 'contact', 'info',
+  'team', 'staff', 'official', 'verified', 'moderator', 'moderators', 'mod', 'mods',
+  'community', 'shop', 'shops', 'account', 'settings', 'api', 'www', 'about', 'terms', 'privacy',
+  'order', 'orders', 'null', 'undefined', 'anonymous', 'unknown', 'me', 'you']);
+
+/** Lower-cases and trims what someone typed (and drops a leading @). */
+export const cleanUsername = (u: string) => u.trim().replace(/^@/, '').toLowerCase();
+
+/** Why this username can't be used, or null when it can (taken is checked by the database). */
+export function usernameProblem(u: string): string | null {
+  if (!USERNAME_RE.test(u) || u.includes('..')) return USERNAME_RULE();
+  if (u.includes('xstitch') || RESERVED.has(u)) return t('ชื่อผู้ใช้นี้สงวนไว้ ลองชื่ออื่น', 'That username is reserved. Try another.');
+  return null;
+}
+
+/** Link to someone's profile page. */
+export const profileHref = (username: string) => `#/@${username}`;
+
+const CREATOR_COLS = 'display_name, username, username_chosen, username_changed_at, official, verified';
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function toCreator(r: any): Creator {
+  const changed = r.username_changed_at ? Date.parse(r.username_changed_at) : 0;
+  const until = r.username_chosen && changed ? new Date(changed + USERNAME_DAYS * 86400e3) : null;
+  return {
+    name: r.display_name, username: r.username, usernameChosen: !!r.username_chosen,
+    usernameLockedUntil: until && until.getTime() > Date.now() ? until : null,
+    official: !!r.official, verified: !!r.verified,
+  };
+}
 
 export async function getMyCreator(): Promise<Creator | null> {
   const u = me();
   const c = await client();
-  const row = await run(() => c.from('creators').select('display_name, official').eq('user_id', u.id).maybeSingle());
-  const r = row as { display_name: string; official: boolean } | null;
-  return r ? { name: r.display_name, official: r.official } : null;
+  const row = await run(() => c.from('creators').select(CREATOR_COLS).eq('user_id', u.id).maybeSingle());
+  return row ? toCreator(row) : null;
 }
 
-export async function saveMyCreator(name: string): Promise<void> {
+/** Sets your display name (and, when given, your @username); creates your public identity the first time. */
+export async function saveMyCreator(name: string, username?: string): Promise<Creator> {
   const u = me();
   const clean = name.trim().slice(0, 40);
   if (!clean) throw new Error(t('ใส่ชื่อที่แสดงก่อน', 'Enter a display name first'));
+  const handle = username === undefined ? undefined : cleanUsername(username);
+  if (handle !== undefined) {
+    const bad = usernameProblem(handle);
+    if (bad) throw new Error(bad);
+  }
   const c = await client();
   const existing = await getMyCreator();
-  if (existing) await run(() => c.from('creators').update({ display_name: clean }).eq('user_id', u.id));
-  else await run(() => c.from('creators').insert({ user_id: u.id, display_name: clean }));
+  const changes: { display_name: string; username?: string } = { display_name: clean };
+  if (handle !== undefined && handle !== existing?.username) changes.username = handle;
+  const row = existing
+    ? await run(() => c.from('creators').update(changes).eq('user_id', u.id).select(CREATOR_COLS).single())
+    : await run(() => c.from('creators').insert({ user_id: u.id, ...changes }).select(CREATOR_COLS).single());
+  return toCreator(row);
+}
+
+/** Whether a username is free (the database has the last word when saving). */
+export async function usernameTaken(username: string): Promise<boolean> {
+  const c = await client();
+  const row = await run(() => c.from('creators').select('user_id').eq('username', username).maybeSingle());
+  const mine = getCloud().user?.id;
+  return !!row && (row as { user_id: string }).user_id !== mine;
+}
+
+export interface Profile extends Author { since: string; shop: { id: number; name: string } | null }
+
+/** A public profile by @username; null when there is no such user. */
+export async function getProfile(username: string): Promise<Profile | null> {
+  const c = await client();
+  const row = await run(() => c.from('creators').select('user_id, display_name, username, official, verified, created_at')
+    .eq('username', cleanUsername(username)).maybeSingle());
+  if (!row) return null;
+  const r = row as { user_id: string; created_at: string };
+  const shops = await run(() => c.from('shops').select('id, name').eq('owner_id', r.user_id).eq('suspended', false).limit(1));
+  const shop = (shops as { id: number; name: string }[] | null)?.[0] ?? null;
+  return { ...toAuthor(r.user_id, row), since: r.created_at, shop };
+}
+
+/** Moderators give or take back the verified badge. */
+export async function setVerified(username: string, on: boolean): Promise<void> {
+  const c = await client();
+  await run(() => c.rpc('set_creator_verified', { p_username: username, p_on: on }));
 }
 
 // ---------- sharing ----------

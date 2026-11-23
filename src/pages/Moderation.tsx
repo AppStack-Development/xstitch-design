@@ -8,7 +8,7 @@ import { t, locale } from '../lib/i18n';
 import { Thumb } from '../components/Thumb';
 import { Icon } from '../components/Icon';
 import { LangSwitch } from '../components/LangSwitch';
-import { TeamBadge, usePostPattern } from '../components/PostCard';
+import { AuthorName, usePostPattern } from '../components/PostCard';
 import { ordersEnabled } from '../lib/orders';
 import { listShopReports, reportReasonLabel, resolveShopReport, setShopSuspended, type ShopReport } from '../lib/shops';
 
@@ -185,7 +185,7 @@ function ReviewCard({ item, handled, onDecided }: { item: ReviewItem; handled: b
           <a className="review-title" href={`#/c/${item.post.id}`}>{item.post.title}</a>
           <span className={`status-chip ${status}`}>{STATUS_LABEL[status]()}</span>
         </div>
-        <div className="post-by">{t('โดย', 'by')} <b>{item.post.author.name}</b>{item.post.author.official && <TeamBadge />}
+        <div className="post-by">{t('โดย', 'by')} <AuthorName author={item.post.author} at />
           <span className="muted">· {t(`แจ้งทั้งหมด ${item.post.reportCount} ครั้ง`, `${item.post.reportCount} reports in total`)}</span>
           {!handled && days >= 5 && <span className="review-late">{t(`รอมา ${days} วัน`, `waiting ${days} days`)}</span>}
         </div>

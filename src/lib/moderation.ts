@@ -1,5 +1,5 @@
 import { client, getCloud } from './cloud';
-import type { Post, ReportReason } from './community';
+import type { Author, Post, ReportReason } from './community';
 import { t } from './i18n';
 
 /**
@@ -22,7 +22,7 @@ export interface ReviewReport {
 
 /** One reported post with its reports. */
 export interface ReviewItem {
-  post: Pick<Post, 'id' | 'title' | 'status' | 'base' | 'data' | 'createdAt'> & { reportCount: number; author: { name: string; official: boolean } };
+  post: Pick<Post, 'id' | 'title' | 'status' | 'base' | 'data' | 'createdAt'> & { reportCount: number; author: Author };
   reports: ReviewReport[];
 }
 
@@ -40,7 +40,7 @@ export const DECISION_LABEL: Record<Decision, () => string> = {
 };
 
 const SELECT = 'id, reason, note, created_at, reporter, resolved_at, resolution, post_id, '
-  + 'posts(id, title, status, base, data, created_at, report_count, creators(display_name, official))';
+  + 'posts(id, title, status, base, data, created_at, report_count, creators(display_name, username, official, verified))';
 
 async function check<T>(p: PromiseLike<{ data: T; error: unknown }>): Promise<T> {
   const { data, error } = await p;
@@ -77,7 +77,7 @@ function group(rows: any[]): ReviewItem[] {
       item = {
         post: {
           id: p.id, title: p.title, status: p.status, base: p.base, data: p.data, createdAt: p.created_at, reportCount: p.report_count,
-          author: { name: p.creators?.display_name ?? '', official: !!p.creators?.official },
+          author: { id: p.author ?? '', name: p.creators?.display_name ?? '', username: p.creators?.username ?? '', official: !!p.creators?.official, verified: !!p.creators?.verified },
         },
         reports: [],
       };

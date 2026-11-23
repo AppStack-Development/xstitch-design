@@ -84,7 +84,7 @@ export function Privacy() {
               <li>{t('ลายปักของคุณ รวมถึงความคืบหน้าการปัก', 'Your patterns, including your stitching progress')}</li>
               <li>{t('รายการ “ด้ายของฉัน”', 'Your “My threads” list')}</li>
               <li>{t('ภาษาที่คุณเลือกใช้', 'Your language preference')}</li>
-              <li>{t('ถ้าคุณแชร์ลายในชุมชน: ชื่อที่แสดงที่คุณตั้งเอง ลายที่แชร์ และลายที่คุณกดหัวใจ', 'If you share in the community: the display name you choose, the patterns you share, and the patterns you like')}</li>
+              <li>{t('ถ้าคุณแชร์ลายในชุมชนหรือตั้งโปรไฟล์: ชื่อที่แสดงและชื่อผู้ใช้ (@username) ที่คุณตั้งเอง ลายที่แชร์ และลายที่คุณกดหัวใจ', 'If you share in the community or set up a profile: the display name and @username you choose, the patterns you share, and the patterns you like')}</li>
             </ul>
           </Sec>
 
@@ -95,7 +95,7 @@ export function Privacy() {
 
           <Sec title={t('ลายที่คุณแชร์ในชุมชนเป็นสาธารณะ', 'What you share in the community is public')}>
             <ul>
-              <li>{t('ทุกคน รวมถึงคนที่ไม่ได้เข้าสู่ระบบ เห็นลาย ชื่อลาย คำอธิบาย หมวด วันที่แชร์ จำนวนหัวใจ และชื่อที่แสดงของคุณ', 'Anyone, signed in or not, can see the pattern, its title, description, categories, date, number of likes and your display name')}</li>
+              <li>{t('ทุกคน รวมถึงคนที่ไม่ได้เข้าสู่ระบบ เห็นลาย ชื่อลาย คำอธิบาย หมวด วันที่แชร์ จำนวนหัวใจ ชื่อที่แสดง ชื่อผู้ใช้ และหน้าโปรไฟล์ของคุณ (ลายที่แชร์ทั้งหมด วันที่เข้าร่วม และร้านของคุณถ้ามี)', 'Anyone, signed in or not, can see the pattern, its title, description, categories, date, number of likes, your display name, username and profile page (all your shared patterns, when you joined, and your shop if you have one)')}</li>
               <li>{t('เราไม่แสดงอีเมล ชื่อ หรือรูปจากบัญชี Google ของคุณในชุมชน และไม่บอกใครว่าใครกดหัวใจลายไหน', 'We never show your email, Google name or picture in the community, and never show who liked what')}</li>
               <li>{t('ความคืบหน้าการปักและรายการด้ายของคุณไม่ถูกแชร์', 'Your stitching progress and thread list are never shared')}</li>
               <li>{t('ถอนลายได้ทุกเมื่อที่หน้าบัญชี ข้อมูลลายจะถูกลบทันที แต่สำเนาที่คนอื่นบันทึกไว้ก่อนแล้วยังอยู่ในเครื่องของเขา', 'Take a pattern down any time on your Account page; it is deleted right away, but copies others already saved stay on their devices')}</li>
