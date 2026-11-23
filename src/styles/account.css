@@ -176,3 +176,15 @@
 /* "ลายของฉัน" moved here from the home page (components/MyPatterns.tsx): full page width above the column */
 .account-main .my-patterns { padding: 0; margin-bottom: 28px; }
 .my-patterns .section-head .my-patterns-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+/* shared patterns inside My patterns: tabs, the badge on the picture and the hearts / take-down line */
+.my-patterns-tabs { display: flex; align-items: center; gap: 8px 14px; flex-wrap: wrap; margin: -4px 0 16px; }
+.my-patterns-tabs .hint { margin: 0; }
+.my-patterns .card-thumb { position: relative; }
+.shared-badge { position: absolute; top: 8px; left: 8px; display: inline-flex; align-items: center; gap: 4px; font-size: 11.5px; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: #ffffffe6; color: var(--brand); border: 1px solid var(--line); }
+.card-shared { display: flex; align-items: center; flex-wrap: wrap; gap: 2px 10px; font-size: 12.5px; color: var(--ink-2); margin: 2px 0; }
+.card-shared .card-likes { display: inline-flex; align-items: center; gap: 3px; color: var(--thread); font-weight: 600; }
+.card-shared a { color: var(--brand); }
+.card-shared .link-btn { padding: 0; font-size: 12.5px; color: var(--err); }
+@media (max-width: 600px) { .my-patterns-tabs .seg { width: 100%; } .my-patterns-tabs .seg button { flex: 1; } }
+/* cards in a row keep their buttons on one line, whatever the text above */
+.my-patterns .card-body { flex: 1; }
