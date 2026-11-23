@@ -13,6 +13,11 @@ import { communityEnabled, listPosts, myLikes, type Post } from '../lib/communit
 import { useCloud } from '../lib/cloud';
 import { PostCard } from '../components/PostCard';
 import { APP_NAME } from '../lib/brand';
+import { Thumb } from '../components/Thumb';
+import { listPatterns } from '../lib/storage';
+import { computeProgress } from '../lib/progress';
+import { PATTERNS_PULLED } from '../lib/sync';
+import type { Pattern } from '../types';
 
 /**
  * Card art drawn from the real heart-keychain template, so every hole sits exactly
@@ -62,6 +67,55 @@ function TemplateArt() {
     }
   }
   return <svg viewBox={`-3 -3 ${cols * s + 6} ${rows * s + 6}`}>{cells}</svg>;
+}
+
+/** Patterns with stitching started but not finished, most recently touched first. */
+function inProgress(): { p: Pattern; pct: number }[] {
+  return listPatterns()
+    .filter((p) => p.progress && p.progress.done.includes('1'))
+    .map((p) => {
+      const pr = computeProgress(p);
+      return { p, pct: pr.total ? pr.pct : 0, open: pr.done > 0 && pr.done < pr.total };
+    })
+    .filter((x) => x.open);
+}
+
+/**
+ * "ปักต่อ": the pattern you were last stitching, one tap back into stitch mode. Only shown when there is one;
+ * the rest of your patterns are on the "ของฉัน" page.
+ */
+function ContinueStitching() {
+  const [items, setItems] = useState(inProgress);
+  useEffect(() => {
+    const on = () => setItems(inProgress());
+    window.addEventListener(PATTERNS_PULLED, on);
+    return () => window.removeEventListener(PATTERNS_PULLED, on);
+  }, []);
+  if (!items.length) return null;
+  const { p, pct } = items[0];
+  const href = `#/stitch/${p.id}`;
+  const pctLabel = pct < 1 ? '<1%' : `${Math.floor(pct)}%`;
+  return (
+    <section className="continue-strip" aria-label={t('ปักต่อ', 'Keep stitching')}>
+      <div className="continue-card">
+        <a className="continue-thumb" href={href} tabIndex={-1} aria-hidden="true"><Thumb pattern={p} max={64} view="stitch" /></a>
+        <div className="continue-text">
+          <span className="continue-label">{t('ปักต่อจากที่ค้างไว้', 'Pick up where you left off')}</span>
+          <a className="continue-name" href={href}>{p.name}</a>
+          <div className="card-progress">
+            <div className="bar"><i style={{ width: `${pct}%` }} /></div>
+            <span>{t(`ปักแล้ว ${pctLabel}`, `${pctLabel} stitched`)}</span>
+          </div>
+        </div>
+        <a className="btn primary continue-go" href={href}><Icon name="needle" size={16} /> {t('ปักต่อ', 'Keep stitching')}</a>
+      </div>
+      <a className="continue-more" href="#/account">
+        {items.length > 1
+          ? t(`และอีก ${items.length - 1} ลายที่ปักค้างไว้ · ดูลายของฉัน →`, `${items.length - 1} more in progress · see My patterns →`)
+          : t('ดูลายของฉันทั้งหมด →', 'See all my patterns →')}
+      </a>
+    </section>
+  );
 }
 
 /** The newest community patterns, with a way into the full gallery. */
@@ -133,6 +187,8 @@ export function Home() {
           <button className="icon-btn sm" onClick={() => setIosHelp(false)} title={t('ปิด', 'Close')}><Icon name="close" size={16} /></button>
         </div>
       )}
+      <ContinueStitching />
+
       <section className="hero">
         <div className="hero-text">
           <h1>{t(<>ออกแบบลายปัก<br />สำหรับผ้าและชิ้นงานพิมพ์&nbsp;3&nbsp;มิติ</>, <>Design stitch patterns<br />for fabric and 3D prints</>)}</h1>
