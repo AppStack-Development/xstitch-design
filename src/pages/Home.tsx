@@ -54,16 +54,16 @@ const FEATURES: { art: FeatureArtKind; title: () => string; text: () => string; 
   },
   {
     art: 'community', href: '#/community',
-    title: () => t('ลายจากชุมชน และสั่งทำ', 'Community patterns, and having one made'),
+    title: () => t('แกลเลอรีลายปัก และสั่งทำ', 'The pattern gallery, and having one made'),
     text: () => t('เลือกลายที่คนอื่นแชร์มาปัก แชร์ลายของคุณ หรือสั่งร้านทำชิ้นงานให้', 'Stitch a pattern someone shared, share your own, or order a shop to make it for you.'),
-    go: () => t('ดูลายจากชุมชน', 'Browse patterns'),
+    go: () => t('ดูแกลเลอรีลายปัก', 'Browse the gallery'),
   },
 ];
 
 function Features() {
   return (
     <section className="features" aria-labelledby="features-title">
-      <h2 id="features-title">{t('ทำอะไรได้บ้าง', 'What you can do here')}</h2>
+      <h2 id="features-title">{t('ครบทุกขั้น ตั้งแต่ออกแบบจนปักเสร็จ', 'Everything from first idea to finished stitch')}</h2>
       <div className="feature-grid">
         {FEATURES.map((f) => (
           <a key={f.href} className="feature-card" href={f.href}>
@@ -159,12 +159,12 @@ function CommunityPreview() {
   return (
     <section className="samples community-strip">
       <div className="section-head">
-        <h2>{t('ลายจากชุมชน', 'Community patterns')} <small>{t('ลายที่ผู้ใช้แชร์ · ลองปักหรือแก้เป็นลายของคุณได้', 'Shared by users · stitch them or make them yours')}</small></h2>
+        <h2>{t('แกลเลอรีลายปัก', 'Pattern gallery')} <small>{t('ลายที่ผู้ใช้แชร์ · ลองปักหรือแก้เป็นลายของคุณได้', 'Shared by users · stitch them or make them yours')}</small></h2>
         <a className="btn sm ghost" href="#/community"><Icon name="people" size={15} /> {t('ดูทั้งหมด', 'See all')}</a>
       </div>
       {posts && !posts.length ? (
         <a className="community-empty" href="#/community">
-          <b>{t('ยังไม่มีลายจากชุมชน', 'No community patterns yet')}</b>
+          <b>{t('ยังไม่มีลายในแกลเลอรี', 'No patterns in the gallery yet')}</b>
           <span>{t('แชร์ลายของคุณเป็นคนแรก →', 'Be the first to share yours →')}</span>
         </a>
       ) : (
@@ -210,7 +210,7 @@ export function Home() {
             'Turn a photo into a pattern, design one cell by cell, or pick one someone shared, then stitch it on fabric or a 3D-printed piece. Free, no sign-up.')}</p>
           <div className="btn-row hero-actions">
             <a className="btn primary" href="#/quick"><Icon name="image" size={16} /> {t('สร้างลายจากรูป', 'Pattern from a photo')}</a>
-            <a className="btn" href="#/community"><Icon name="people" size={16} /> {t('ดูลายจากชุมชน', 'Browse patterns')}</a>
+            <a className="btn" href="#/community"><Icon name="people" size={16} /> {t('ดูแกลเลอรีลายปัก', 'Browse the gallery')}</a>
           </div>
         </div>
         <HeroStitch />

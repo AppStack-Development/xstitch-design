@@ -327,7 +327,7 @@ export function Editor({ id }: { id: string }) {
               )}
               {communityEnabled && (
                 <button onClick={() => { setMenu(false); keep(p, true); setPublish(true); }}>
-                  <Icon name="people" /> <span><b>{p.postId ? t('อัปเดตในชุมชน', 'Update in the community') : t('แชร์ในชุมชน', 'Share with the community')}</b><small>{t('ให้ทุกคนเห็นและลองปักลายนี้ได้', 'Let everyone see and stitch this pattern')}</small></span>
+                  <Icon name="people" /> <span><b>{p.postId ? t('อัปเดตในแกลเลอรี', 'Update in the gallery') : t('แชร์ลงแกลเลอรี', 'Share to the gallery')}</b><small>{t('ให้ทุกคนเห็นและลองปักลายนี้ได้', 'Let everyone see and stitch this pattern')}</small></span>
                 </button>
               )}
               <button onClick={() => doExport('json')}><Icon name="file" /> <span><b>{t('ไฟล์ลาย (.json)', 'Pattern file (.json)')}</b><small>{t('สำรองข้อมูล / นำเข้าเครื่องอื่น', 'Backup / import on another device')}</small></span></button>

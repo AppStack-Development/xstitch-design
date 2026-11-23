@@ -98,7 +98,7 @@ export function CommunityPost({ id }: { id: string }) {
         <StitchArt kind="lost" />
         <h2>{t('ไม่พบลายนี้', 'Pattern not found')}</h2>
         <p className="muted">{t('ผู้ออกแบบอาจถอนลายออกแล้ว', 'The designer may have taken it down.')}</p>
-        <a className="btn primary" href="#/community">{t('ดูลายอื่นในชุมชน', 'Browse community patterns')}</a>
+        <a className="btn primary" href="#/community">{t('ดูลายอื่นในแกลเลอรี', 'Browse the pattern gallery')}</a>
       </div>
     );
   }
@@ -155,8 +155,8 @@ export function CommunityPost({ id }: { id: string }) {
   return (
     <div className="shared post-page">
       <header className="site-head">
-        <a className="icon-btn" href="#/community" title={t('กลับไปลายจากชุมชน', 'Back to community patterns')} aria-label={t('กลับไปลายจากชุมชน', 'Back to community patterns')}><Icon name="back" /></a>
-        <h2><Icon name="people" size={18} /> {t('ลายจากชุมชน', 'Community patterns')}</h2>
+        <a className="icon-btn" href="#/community" title={t('กลับไปแกลเลอรีลายปัก', 'Back to the pattern gallery')} aria-label={t('กลับไปแกลเลอรีลายปัก', 'Back to the pattern gallery')}><Icon name="back" /></a>
+        <h2><Icon name="people" size={18} /> {t('แกลเลอรีลายปัก', 'Pattern gallery')}</h2>
         <div className="spacer" />
         <AccountButton />
         <LangSwitch />

@@ -7,7 +7,7 @@ import { uid } from './threads';
 import { t } from './i18n';
 
 /**
- * Community gallery ("ลายจากชุมชน"): patterns people chose to share publicly.
+ * Community gallery ("แกลเลอรีลายปัก"): patterns people chose to share publicly.
  * Tables and permissions: supabase/migrations/0003_community.sql · design: docs/community-gallery.md
  *
  * Browsing works signed out; sharing, likes and "my shared patterns" need an account.

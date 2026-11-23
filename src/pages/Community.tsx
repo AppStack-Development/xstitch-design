@@ -13,7 +13,7 @@ import { APP_NAME } from '../lib/brand';
 
 type Filter = 'all' | PostBase;
 
-/** "ลายจากชุมชน": everyone's shared patterns. Browsing needs no account. #/community/<tag> opens one category. */
+/** "แกลเลอรีลายปัก": everyone's shared patterns. Browsing needs no account. #/community/<tag> opens one category. */
 export function Community({ tag: initialTag }: { tag?: string }) {
   const cloud = useCloud();
   const [filter, setFilter] = useState<Filter>('all');
@@ -79,7 +79,7 @@ export function Community({ tag: initialTag }: { tag?: string }) {
     <div className="community-page">
       <header className="site-head">
         <a className="icon-btn" href="#/" title={t('กลับหน้าแรก', 'Back to home')} aria-label={t('กลับหน้าแรก', 'Back to home')}><Icon name="back" /></a>
-        <h2><Icon name="people" size={18} /> {t('ลายจากชุมชน', 'Community patterns')}</h2>
+        <h2><Icon name="people" size={18} /> {t('แกลเลอรีลายปัก', 'Pattern gallery')}</h2>
         <div className="spacer" />
         <AccountButton />
         <LangSwitch />
@@ -88,7 +88,7 @@ export function Community({ tag: initialTag }: { tag?: string }) {
       <main className="community-main">
         <section className="community-intro">
           <div>
-            <h1>{t('ลายจากชุมชน', 'Community patterns')}</h1>
+            <h1>{t('แกลเลอรีลายปัก', 'Pattern gallery')}</h1>
             <p className="muted">{t(`ลายที่ผู้ใช้ ${APP_NAME} แชร์ไว้ กดลองปักหรือเอาไปแก้เป็นลายของคุณได้เลย ไม่ต้องเข้าสู่ระบบ`,
               `Patterns shared by ${APP_NAME} users. Stitch one or make it your own; no account needed.`)}</p>
           </div>
@@ -98,7 +98,7 @@ export function Community({ tag: initialTag }: { tag?: string }) {
         </section>
 
         {!communityEnabled ? (
-          <p className="muted">{t('พื้นที่แชร์ผลงานยังไม่เปิดในเว็บนี้', 'The community gallery isn’t available on this site.')}</p>
+          <p className="muted">{t('พื้นที่แชร์ผลงานยังไม่เปิดในเว็บนี้', 'The pattern gallery isn’t available on this site.')}</p>
         ) : (
           <>
             <div className="community-filters">
@@ -149,7 +149,7 @@ export function Community({ tag: initialTag }: { tag?: string }) {
       </main>
 
       <footer className="site-foot">
-        <span>{t('ลายในชุมชนใช้ส่วนตัวและดัดแปลงได้ โปรดให้เครดิตผู้ออกแบบ', 'Community patterns are for personal use and remixing, with credit to the designer.')}</span>
+        <span>{t('ลายในแกลเลอรีใช้ส่วนตัวและดัดแปลงได้ โปรดให้เครดิตผู้ออกแบบ', 'Gallery patterns are for personal use and remixing, with credit to the designer.')}</span>
         <span className="spacer" />
         <a href="#/terms">{t('ข้อกำหนดการแชร์', 'Sharing terms')}</a>
         <FeedbackLink />

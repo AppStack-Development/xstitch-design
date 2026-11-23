@@ -122,8 +122,8 @@ export function MyPatterns() {
       message: <>
         <p>{t(<><b>“{p.name}”</b> จะถูกลบจากเครื่องนี้ และจากบัญชีของคุณถ้าเข้าสู่ระบบอยู่ กู้คืนไม่ได้</>,
           <><b>“{p.name}”</b> will be deleted from this device, and from your account if you’re signed in. This can’t be undone.</>)}</p>
-        {shared && <p>{t('ลายที่แชร์ไว้ในชุมชนยังอยู่ ถ้าจะเอาออกจากชุมชนด้วย กด “ถอนออก” ก่อน',
-          'The copy shared in the community stays. To take that down too, use “Take down” first.')}</p>}
+        {shared && <p>{t('ลายที่แชร์ไว้ในแกลเลอรียังอยู่ ถ้าจะเอาออกจากแกลเลอรีด้วย กด “ถอนออก” ก่อน',
+          'The copy shared in the gallery stays. To take that down too, use “Take down” first.')}</p>}
       </>,
       ok: t('ลบลาย', 'Delete pattern'),
       tone: 'danger',
@@ -135,8 +135,8 @@ export function MyPatterns() {
 
   const takeDown = async (post: Post) => {
     if (!(await askConfirm({
-      title: t('ถอนลายออกจากชุมชน?', 'Take it down?'),
-      message: <p>{t(<><b>“{post.title}”</b> จะไม่แสดงในชุมชนอีก ลายในเครื่องของคุณยังอยู่ แต่หัวใจทั้งหมดจะหายไป</>,
+      title: t('ถอนลายออกจากแกลเลอรี?', 'Take it down?'),
+      message: <p>{t(<><b>“{post.title}”</b> จะไม่แสดงในแกลเลอรีอีก ลายในเครื่องของคุณยังอยู่ แต่หัวใจทั้งหมดจะหายไป</>,
         <><b>“{post.title}”</b> leaves the community. Your own copy stays, but its likes are lost.</>)}</p>,
       ok: t('ถอนออก', 'Take down'),
       tone: 'danger',
@@ -176,7 +176,7 @@ export function MyPatterns() {
               <button key={k} role="tab" aria-selected={filter === k} className={filter === k ? 'on' : ''} onClick={() => { setFilter(k); setLimit(PAGE); }}>{label}</button>
             ))}
           </div>
-          {filter === 'shared' && <p className="hint">{t('อัปเดตลายที่แชร์ได้จากหน้าแก้ไขลาย ด้วยเมนู ส่งออก / แชร์ → แชร์ในชุมชน', 'To update a shared pattern, open it in the editor and use Export / share → Share with the community.')}</p>}
+          {filter === 'shared' && <p className="hint">{t('อัปเดตลายที่แชร์ได้จากหน้าแก้ไขลาย ด้วยเมนู ส่งออก / แชร์ → แชร์ลงแกลเลอรี', 'To update a shared pattern, open it in the editor and use Export / share → Share to the gallery.')}</p>}
         </div>
       )}
       {err && <p className="error small">{err}</p>}
@@ -186,11 +186,11 @@ export function MyPatterns() {
           <StitchArt kind="start" />
           <div>
             <h3>{t('เริ่มลายแรกของคุณ', 'Start your first pattern')}</h3>
-            <p className="muted">{t('สร้างลายจากรูปที่ชอบ หรือเลือกลายจากชุมชนมาลองปัก ลายที่ปักหรือแก้จะเก็บไว้ที่นี่',
-              'Make one from a photo you like, or pick a community pattern to stitch. Patterns you stitch or edit are kept here.')}</p>
+            <p className="muted">{t('สร้างลายจากรูปที่ชอบ หรือเลือกลายจากแกลเลอรีมาลองปัก ลายที่ปักหรือแก้จะเก็บไว้ที่นี่',
+              'Make one from a photo you like, or pick a pattern from the gallery to stitch. Patterns you stitch or edit are kept here.')}</p>
             <div className="btn-row">
               <a className="btn primary" href="#/quick"><Icon name="image" size={16} /> {t('สร้างลายจากรูป', 'Pattern from a photo')}</a>
-              <a className="btn" href="#/community"><Icon name="people" size={16} /> {t('ดูลายจากชุมชน', 'Browse the community')}</a>
+              <a className="btn" href="#/community"><Icon name="people" size={16} /> {t('ดูแกลเลอรีลายปัก', 'Browse the gallery')}</a>
             </div>
           </div>
         </div>
@@ -218,7 +218,7 @@ export function MyPatterns() {
   );
 }
 
-/** "แชร์แล้ว · ♥ 12 · ดูในชุมชน · ถอนออก" under a shared pattern. */
+/** "แชร์แล้ว · ♥ 12 · ดูในแกลเลอรี · ถอนออก" under a shared pattern. */
 function SharedLine({ post, postId, canTakeDown, busy, onTakeDown }: {
   post: Post | null; postId: string; canTakeDown: boolean; busy: boolean; onTakeDown: (post: Post) => void;
 }) {
@@ -227,7 +227,7 @@ function SharedLine({ post, postId, canTakeDown, busy, onTakeDown }: {
       {post && <span className="card-likes"><Icon name="heart" size={13} /> {post.likeCount.toLocaleString()}</span>}
       {post?.status === 'hidden' && <span className="shared-hidden">{t('ซ่อนไว้ รอตรวจสอบ', 'Hidden for review')}</span>}
       {post?.status === 'removed' && <span className="shared-hidden">{t('ทีมงานนำออกแล้ว', 'Removed by the team')}</span>}
-      <a href={`#/c/${postId}`}>{t('ดูในชุมชน', 'View')}</a>
+      <a href={`#/c/${postId}`}>{t('ดูในแกลเลอรี', 'View')}</a>
       {post && canTakeDown && (
         <button type="button" className="link-btn" onClick={() => onTakeDown(post)} disabled={busy}>{busy ? t('กำลังถอน…', 'Removing…') : t('ถอนออก', 'Take down')}</button>
       )}
@@ -297,7 +297,7 @@ function SharedOnlyCard({ post, busy, onTakeDown }: { post: Post; busy: boolean;
         <div className="card-meta">{t(`แชร์ ${shortDate(Date.parse(post.createdAt))} · ไม่มีในเครื่องนี้`, `Shared ${shortDate(Date.parse(post.createdAt))} · not on this device`)}</div>
       </div>
       <div className="card-actions">
-        <a className="btn sm" href={href}><Icon name="people" size={15} /> {t('เปิดในชุมชน', 'Open')}</a>
+        <a className="btn sm" href={href}><Icon name="people" size={15} /> {t('เปิดในแกลเลอรี', 'Open')}</a>
         <span className="spacer" />
       </div>
     </article>

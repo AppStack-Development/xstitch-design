@@ -108,7 +108,7 @@ export function ShopOrderCard({ order, shop, onChanged }: { order: Order; shop: 
           {o.isQuote && <li><span>{t('ฝีเข็ม', 'Stitches')}</span><b>{o.stitches.toLocaleString()}</b></li>}
         </ul>
         <p className="order-addr small">{o.address.name} · {o.address.phone}<br />{o.address.address} {o.address.postcode}</p>
-        {o.postId && <p className="small"><a className="acct-link" href={`#/c/${o.postId}`}>{t('ลายจากชุมชน: เปิดดูลายต้นฉบับ', 'From a community pattern: see the original')}</a></p>}
+        {o.postId && <p className="small"><a className="acct-link" href={`#/c/${o.postId}`}>{t('แกลเลอรีลายปัก: เปิดดูลายต้นฉบับ', 'From a gallery pattern: see the original')}</a></p>}
         {o.note && <p className="review-note">{o.note}</p>}
 
         <div className="order-next">

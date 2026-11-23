@@ -19,17 +19,17 @@ export function Terms() {
   return (
     <div className="privacy-page">
       <header className="site-head">
-        <a className="icon-btn" href="#/community" title={t('กลับไปลายจากชุมชน', 'Back to community patterns')} aria-label={t('กลับไปลายจากชุมชน', 'Back to community patterns')}><Icon name="back" /></a>
+        <a className="icon-btn" href="#/community" title={t('กลับไปแกลเลอรีลายปัก', 'Back to the pattern gallery')} aria-label={t('กลับไปแกลเลอรีลายปัก', 'Back to the pattern gallery')}><Icon name="back" /></a>
         <h2><Icon name="people" size={18} /> {t('ข้อกำหนดการแชร์', 'Sharing terms')}</h2>
         <div className="spacer" />
         <LangSwitch />
       </header>
       <main className="privacy-main">
         <article className="privacy-doc">
-          <h1>{t('ข้อกำหนดการแชร์ลายในชุมชน', 'Terms for sharing in the community')}</h1>
+          <h1>{t('ข้อกำหนดการแชร์ลายลงแกลเลอรี', 'Terms for sharing to the gallery')}</h1>
           <p className="hint">{t('ปรับปรุงล่าสุด 19 พ.ย. 2569', 'Last updated 19 Nov 2026')}</p>
           <p className="privacy-lead">{t(
-            `ข้อกำหนดนี้ใช้เมื่อคุณแชร์ลายใน “ลายจากชุมชน” ของ ${APP_NAME} หรือนำลายจากชุมชนไปใช้ ถ้าแค่ออกแบบและเก็บลายไว้ใช้เอง ข้อกำหนดนี้ไม่เกี่ยวกับคุณ`,
+            `ข้อกำหนดนี้ใช้เมื่อคุณแชร์ลายลงใน “แกลเลอรีลายปัก” ของ ${APP_NAME} หรือนำลายจากแกลเลอรีไปใช้ ถ้าแค่ออกแบบและเก็บลายไว้ใช้เอง ข้อกำหนดนี้ไม่เกี่ยวกับคุณ`,
             `These terms apply when you share a pattern in ${APP_NAME}’s community gallery, or use a pattern from it. If you only design patterns for yourself, they don’t apply to you.`,
           )}</p>
 
@@ -82,8 +82,8 @@ export function Terms() {
           </Sec>
 
           <Sec title={t('ไม่มีการรับประกัน', 'No guarantees')}>
-            <p>{t('ลายในชุมชนแชร์โดยผู้ใช้ เราไม่รับประกันความถูกต้องของจำนวนด้าย ขนาด หรือผลงานที่ได้',
-              'Community patterns are shared by users. We don’t guarantee thread amounts, sizes or results.')}</p>
+            <p>{t('ลายในแกลเลอรีแชร์โดยผู้ใช้ เราไม่รับประกันความถูกต้องของจำนวนด้าย ขนาด หรือผลงานที่ได้',
+              'Gallery patterns are shared by users. We don’t guarantee thread amounts, sizes or results.')}</p>
           </Sec>
 
           <Sec title={t('ติดต่อ', 'Contact')}>

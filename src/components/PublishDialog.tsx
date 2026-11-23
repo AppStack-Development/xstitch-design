@@ -11,7 +11,7 @@ import { Thumb } from './Thumb';
 import { Icon } from './Icon';
 
 /**
- * "แชร์ในชุมชน": share a pattern to the community gallery.
+ * "แชร์ลงแกลเลอรี": share a pattern to the community gallery.
  * Opened from the editor (with its pattern) or from the gallery (pick one of your patterns first).
  */
 export function PublishDialog({ pattern, onClose, onPublished }: {
@@ -43,7 +43,7 @@ export function PublishDialog({ pattern, onClose, onPublished }: {
     <div className="modal-back" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="modal publish-dialog" role="dialog" aria-modal="true" aria-labelledby="publish-title">
         <header className="modal-head">
-          <h3 id="publish-title"><Icon name="people" /> {t('แชร์ในชุมชน', 'Share with the community')}</h3>
+          <h3 id="publish-title"><Icon name="people" /> {t('แชร์ลงแกลเลอรี', 'Share to the gallery')}</h3>
           <button className="icon-btn" onClick={onClose} aria-label={t('ปิด', 'Close')} title={t('ปิด', 'Close')}><Icon name="close" /></button>
         </header>
         {body}
@@ -237,13 +237,13 @@ function Done({ postId, onClose }: { postId: string; onClose: () => void }) {
     <>
       <div className="fb-body fb-done">
         <Icon name="check" size={28} />
-        <p><b>{t('แชร์แล้ว! คนอื่นเห็นลายของคุณในชุมชนแล้ว', 'Shared! Your pattern is now in the community gallery.')}</b></p>
+        <p><b>{t('แชร์แล้ว! คนอื่นเห็นลายของคุณในแกลเลอรีแล้ว', 'Shared! Your pattern is now in the gallery.')}</b></p>
         <p className="muted">{t('แก้ไขหรือถอนลายได้ทุกเมื่อที่หน้าบัญชี', 'You can edit or take it down any time from your Account page.')}</p>
         <button className="btn sm ghost" onClick={copy}><Icon name={copied ? 'check' : 'link'} size={15} /> {copied ? t('คัดลอกแล้ว', 'Copied') : t('คัดลอกลิงก์', 'Copy link')}</button>
       </div>
       <footer className="modal-foot fb-foot">
         <button className="btn" onClick={onClose}>{t('ปิด', 'Close')}</button>
-        <a className="btn primary" href={`#/c/${postId}`} onClick={onClose}>{t('ดูลายในชุมชน', 'View in gallery')}</a>
+        <a className="btn primary" href={`#/c/${postId}`} onClick={onClose}>{t('ดูลายในแกลเลอรี', 'View in gallery')}</a>
       </footer>
     </>
   );

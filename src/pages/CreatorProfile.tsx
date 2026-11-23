@@ -78,8 +78,8 @@ export function CreatorProfile({ username }: { username: string }) {
     if (!(await askConfirm({
       title: on ? t('ให้เครื่องหมายยืนยันตัวตน?', 'Give the verified badge?') : t('ถอนเครื่องหมายยืนยันตัวตน?', 'Take back the verified badge?'),
       message: <p>{on
-        ? t(<><b>{profile.name}</b> (@{profile.username}) จะมีเครื่องหมาย <VerifiedBadge /> ต่อท้ายชื่อทุกที่ในชุมชน ให้เฉพาะคนที่ทีมตรวจแล้วว่าเป็นตัวจริง หรือเป็นเจ้าของลายจริง</>,
-          <><b>{profile.name}</b> (@{profile.username}) gets the <VerifiedBadge /> badge after their name across the community. Give it only to people the team has checked are who they say, or own their designs.</>)
+        ? t(<><b>{profile.name}</b> (@{profile.username}) จะมีเครื่องหมาย <VerifiedBadge /> ต่อท้ายชื่อทุกที่ในแกลเลอรี ให้เฉพาะคนที่ทีมตรวจแล้วว่าเป็นตัวจริง หรือเป็นเจ้าของลายจริง</>,
+          <><b>{profile.name}</b> (@{profile.username}) gets the <VerifiedBadge /> badge after their name across the gallery. Give it only to people the team has checked are who they say, or own their designs.</>)
         : t(<>เครื่องหมายหลังชื่อ <b>{profile.name}</b> จะหายไปทุกที่</>, <>The badge after <b>{profile.name}</b>’s name disappears everywhere.</>)}</p>,
       ok: on ? t('ให้เครื่องหมาย', 'Give badge') : t('ถอนเครื่องหมาย', 'Take it back'),
       tone: on ? undefined : 'danger',
@@ -105,7 +105,7 @@ export function CreatorProfile({ username }: { username: string }) {
       <div className="community-msg">
         <p><b>{t('ไม่พบผู้ใช้นี้', 'User not found')}</b></p>
         <p className="muted">{err || t(`ไม่มีใครใช้ชื่อ @${username} หรือเจ้าของอาจเปลี่ยนชื่อผู้ใช้ไปแล้ว`, `Nobody is called @${username}, or they changed their username.`)}</p>
-        <a className="btn" href="#/community">{t('ไปหน้าชุมชน', 'Go to the community')}</a>
+        <a className="btn" href="#/community">{t('ไปแกลเลอรีลายปัก', 'Go to the gallery')}</a>
       </div>
     );
   } else {
@@ -166,7 +166,7 @@ export function CreatorProfile({ username }: { username: string }) {
   return (
     <div className="community-page shop-profile creator-profile">
       <header className="site-head">
-        <a className="icon-btn" href="#/community" title={t('ไปหน้าชุมชน', 'To the community')} aria-label={t('ไปหน้าชุมชน', 'To the community')}><Icon name="back" /></a>
+        <a className="icon-btn" href="#/community" title={t('ไปแกลเลอรีลายปัก', 'To the gallery')} aria-label={t('ไปแกลเลอรีลายปัก', 'To the gallery')}><Icon name="back" /></a>
         <h2><Icon name="people" size={18} /> {profile ? profile.name : t('โปรไฟล์', 'Profile')}</h2>
         <div className="spacer" />
         <AccountButton />

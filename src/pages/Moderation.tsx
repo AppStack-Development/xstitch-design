@@ -71,7 +71,7 @@ export function Moderation({ startTab }: { startTab?: Tab } = {}) {
           ? t('บัญชีนี้ไม่มีสิทธิ์ตรวจการแจ้งปัญหา', 'This account can’t review reports.')
           : t('เข้าสู่ระบบด้วยบัญชีทีมงานก่อน', 'Sign in with a team account first.')}</p>
         <a className="btn" href={cloud.status === 'signed-in' ? '#/community' : '#/account'}>
-          {cloud.status === 'signed-in' ? t('ไปหน้าลายจากชุมชน', 'Go to community patterns') : t('ไปหน้าเข้าสู่ระบบ', 'Go to sign in')}
+          {cloud.status === 'signed-in' ? t('ไปแกลเลอรีลายปัก', 'Go to the pattern gallery') : t('ไปหน้าเข้าสู่ระบบ', 'Go to sign in')}
         </a>
       </div>
     );
@@ -155,7 +155,7 @@ function ReviewCard({ item, handled, onDecided }: { item: ReviewItem; handled: b
 
   const act = async (d: Decision) => {
     if (d === 'removed' && !(await askConfirm({
-      title: t('นำลายออกจากชุมชน?', 'Remove from the community?'),
+      title: t('นำลายออกจากแกลเลอรี?', 'Remove from the gallery?'),
       message: <p>{t(<><b>“{item.post.title}”</b> จะไม่แสดงให้คนอื่นเห็นอีก ผู้ออกแบบยังเห็นในหน้าบัญชีว่าถูกนำออก</>,
         <>Nobody else will see <b>“{item.post.title}”</b>. The designer sees it marked as removed on their account page.</>)}</p>,
       ok: t('นำออก', 'Remove'),

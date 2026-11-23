@@ -174,7 +174,7 @@ export function friendlyOrderError(message: string): string {
   if (/terms not accepted/.test(message)) return t('ต้องยอมรับเงื่อนไขการสั่งซื้อก่อน', 'Please accept the order terms first.');
   if (/seller terms not accepted/.test(message)) return t('ต้องยอมรับข้อกำหนดผู้ขายก่อนเปิดร้าน', 'Accept the seller terms to open a shop.');
   if (/design not allowed/.test(message)) return t('เจ้าของลายยังไม่อนุญาตให้ร้านอื่นผลิตลายนี้', 'The pattern’s author doesn’t let other shops make it.');
-  if (/design not available/.test(message)) return t('ลายนี้ไม่ได้เปิดให้เห็นในชุมชนแล้ว', 'This pattern is no longer shown in the community.');
+  if (/design not available/.test(message)) return t('ลายนี้ไม่ได้เปิดให้เห็นในแกลเลอรีแล้ว', 'This pattern is no longer shown in the gallery.');
   if (/wrong product/.test(message)) return t('สินค้านี้ไม่ตรงกับชนิดของลาย', 'That product doesn’t fit this kind of pattern.');
   if (/rights not confirmed/.test(message)) return t('ยืนยันก่อนว่าคุณมีสิทธิ์ให้ผลิตลายนี้', 'Confirm you may have this design made first.');
   if (/set up PromptPay first/.test(message)) return t('ตั้งพร้อมเพย์ในตั้งค่าร้านก่อนรับออเดอร์', 'Set up PromptPay in the shop settings before accepting orders.');

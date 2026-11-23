@@ -439,8 +439,8 @@ function PublicProfileCard() {
           <span className="muted">· {creator.verified ? t('ทีมงานยืนยันตัวตนแล้ว', 'Verified by the team') : t('ยังไม่ได้ยืนยันตัวตน', 'Not verified')}</span>
         </p>
       ) : (
-        <p className="muted">{t('ตั้งชื่อที่คนอื่นเห็นในชุมชน และชื่อผู้ใช้สำหรับหน้าโปรไฟล์ของคุณ ชื่อบัญชี Google จะไม่ถูกแสดง',
-          'Choose the name people see in the community and a username for your profile page. Your Google name is never shown.')}</p>
+        <p className="muted">{t('ตั้งชื่อที่คนอื่นเห็นในแกลเลอรี และชื่อผู้ใช้สำหรับหน้าโปรไฟล์ของคุณ ชื่อบัญชี Google จะไม่ถูกแสดง',
+          'Choose the name people see in the gallery and a username for your profile page. Your Google name is never shown.')}</p>
       )}
       <div className="acct-profile-fields">
         <label className="fb-field">

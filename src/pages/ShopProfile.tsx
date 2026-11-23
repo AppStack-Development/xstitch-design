@@ -53,7 +53,7 @@ export function ShopProfile({ id }: { id: number }) {
       <div className="community-msg">
         <p><b>{t('ไม่พบร้านนี้', 'Shop not found')}</b></p>
         <p className="muted">{err || t('ร้านอาจปิดไปแล้ว หรือถูกระงับ', 'It may have closed or been suspended.')}</p>
-        <a className="btn" href="#/community">{t('ไปหน้าชุมชน', 'Go to the community')}</a>
+        <a className="btn" href="#/community">{t('ไปแกลเลอรีลายปัก', 'Go to the gallery')}</a>
       </div>
     );
   } else {
@@ -134,7 +134,7 @@ export function ShopProfile({ id }: { id: number }) {
   return (
     <div className="community-page shop-profile">
       <header className="site-head">
-        <a className="icon-btn" href="#/community" title={t('ไปหน้าชุมชน', 'To the community')} aria-label={t('ไปหน้าชุมชน', 'To the community')}><Icon name="back" /></a>
+        <a className="icon-btn" href="#/community" title={t('ไปแกลเลอรีลายปัก', 'To the gallery')} aria-label={t('ไปแกลเลอรีลายปัก', 'To the gallery')}><Icon name="back" /></a>
         <h2><Icon name="cube" size={18} /> {profile ? profile.shop.name : t('ร้าน', 'Shop')}</h2>
         <div className="spacer" />
         <AccountButton />

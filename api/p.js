@@ -10,7 +10,7 @@ export async function GET(request) {
   const target = validId(id) ? `/#/c/${id}` : '/#/community';
   const post = validId(id) ? await fetchPost(id).catch(() => null) : null;
 
-  const title = post ? `${post.title} · XStitch.Design` : 'ลายจากชุมชน · XStitch.Design';
+  const title = post ? `${post.title} · XStitch.Design` : 'แกลเลอรีลายปัก · XStitch.Design';
   const by = post?.creators?.display_name ? `โดย ${post.creators.display_name}` : '';
   const facts = post
     ? [post.base === 'print3d' ? (post.template_name || 'ชิ้นงาน 3D') : 'ผ้า Aida', DIFF[post.difficulty] ?? '', `${post.colors} สี`, `${Number(post.stitches).toLocaleString('en-US')} ฝีเข็ม`].filter(Boolean).join(' · ')
@@ -33,7 +33,7 @@ export async function GET(request) {
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="XStitch.Design">
 <meta property="og:locale" content="th_TH">
-<meta property="og:title" content="${escapeHtml(post ? post.title : 'ลายจากชุมชน')}">
+<meta property="og:title" content="${escapeHtml(post ? post.title : 'แกลเลอรีลายปัก')}">
 <meta property="og:description" content="${escapeHtml(description)}">
 <meta property="og:url" content="${escapeHtml(canonical)}">
 <meta property="og:image" content="${escapeHtml(image)}">
@@ -42,7 +42,7 @@ export async function GET(request) {
 <meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="${escapeHtml(post ? `ลายปัก ${post.title}` : 'XStitch.Design')}">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="${escapeHtml(post ? post.title : 'ลายจากชุมชน')}">
+<meta name="twitter:title" content="${escapeHtml(post ? post.title : 'แกลเลอรีลายปัก')}">
 <meta name="twitter:description" content="${escapeHtml(description)}">
 <meta name="twitter:image" content="${escapeHtml(image)}">
 <meta http-equiv="refresh" content="0;url=${escapeHtml(target)}">

@@ -63,7 +63,7 @@ function useSections(): Section[] {
         <>
           <p>{APP_NAME} ใช้ออกแบบลายปักแบบครอสติช (cross stitch) ทั้งบน<b>ผ้า Aida</b> และบน<b>ชิ้นงานพิมพ์ 3 มิติ</b>ที่เจาะรูไว้ให้ปัก เช่น พวงกุญแจ ที่คั่นหนังสือ หรือฝากล่อง</p>
           <ol>
-            <li>ที่หน้าแรก กด <b>“สร้างลายจากรูป”</b> (<Go to="quick">ง่ายที่สุด</Go>) หรือเลือกโหมดขั้นสูง <b>“ออกแบบอิสระ”</b> / <b>“ใช้โมเดลแม่แบบ”</b> หรือลอง<Go to="community">ลายจากชุมชน</Go>ที่คนอื่นแชร์ไว้ ลายที่คุณสร้างหรือปักจะอยู่ใน <b>“ลายของฉัน”</b> ที่ปุ่ม <b>ของฉัน</b> มุมขวาบน</li>
+            <li>ที่หน้าแรก กด <b>“สร้างลายจากรูป”</b> (<Go to="quick">ง่ายที่สุด</Go>) หรือเลือกโหมดขั้นสูง <b>“ออกแบบอิสระ”</b> / <b>“ใช้โมเดลแม่แบบ”</b> หรือลอง<Go to="community">แกลเลอรีลายปัก</Go>ที่คนอื่นแชร์ไว้ ลายที่คุณสร้างหรือปักจะอยู่ใน <b>“ลายของฉัน”</b> ที่ปุ่ม <b>ของฉัน</b> มุมขวาบน</li>
             <li>เติมสีลงในช่องด้วยเครื่องมือวาด หรือแปลงจากรูปภาพ</li>
             <li>ใส่รายละเอียด เช่น ด้าย เข็ม วัสดุ ในแท็บ “รายละเอียด”</li>
             <li>พิมพ์แผนผัง แชร์ให้เพื่อน หรือเปิด <b>โหมดปัก</b> เพื่อติ๊กช่องที่ปักแล้วระหว่างปักจริง</li>
@@ -133,10 +133,10 @@ function useSections(): Section[] {
       ),
     },
     {
-      id: 'community', title: t('ลายจากชุมชน', 'Community patterns'), icon: 'people',
+      id: 'community', title: t('แกลเลอรีลายปัก', 'Pattern gallery'), icon: 'people',
       body: t(
         <>
-          <p>ลายที่ผู้ใช้ {APP_NAME} แชร์ไว้ให้ทุกคนใช้ เปิดได้จาก <b>“ลายจากชุมชน”</b> บนหน้าแรก (กด “ดูทั้งหมด”) ดูและปักได้โดย<b>ไม่ต้องเข้าสู่ระบบ</b></p>
+          <p>ลายที่ผู้ใช้ {APP_NAME} แชร์ไว้ให้ทุกคนใช้ เปิดได้จาก <b>“แกลเลอรีลายปัก”</b> บนหน้าแรก (กด “ดูทั้งหมด”) ดูและปักได้โดย<b>ไม่ต้องเข้าสู่ระบบ</b></p>
           <ul>
             <li>กรองลายบนผ้า / ชิ้นงาน 3D และหมวด เช่น สัตว์ เทศกาล หรือเรียงตาม “หัวใจมากสุด”</li>
             <li><b>ลองปัก</b> บันทึกสำเนาไว้ในเครื่องแล้วเปิดโหมดปักทันที ครั้งต่อไปปุ่มจะเป็น “ปักต่อ”</li>
@@ -144,7 +144,7 @@ function useSections(): Section[] {
             <li>ลายชิ้นงาน 3D กด <b>ดาวน์โหลด STL</b> ในหน้าลายได้เลย ยกเว้นลายบนกล่องปักลายของทีม ซึ่งกด <b>สั่งผลิต</b> ได้อย่างเดียว</li>
             <li>กด <b>หัวใจ</b> ให้ลายที่ชอบได้เมื่อเข้าสู่ระบบ</li>
           </ul>
-          <p><b>แชร์ลายของคุณ</b>: ในหน้าออกแบบ กด “ส่งออก / แชร์” → <b>“แชร์ในชุมชน”</b> (ต้อง<a className="guide-link" href="#/account">เข้าสู่ระบบ</a>) ตั้งชื่อที่แสดง (ใช้ชื่อเล่นได้) ชื่อลาย คำอธิบาย และหมวด แล้วยืนยันว่าออกแบบเองหรือได้รับอนุญาต ถ้าแก้ลายทีหลัง เปิดเมนูเดิมแล้วกด “อัปเดต” หัวใจที่ได้ยังอยู่ ถอนลายออกได้ทุกเมื่อที่หน้าบัญชี (ส่วน “ลายที่ฉันแชร์”)</p>
+          <p><b>แชร์ลายของคุณ</b>: ในหน้าออกแบบ กด “ส่งออก / แชร์” → <b>“แชร์ลงแกลเลอรี”</b> (ต้อง<a className="guide-link" href="#/account">เข้าสู่ระบบ</a>) ตั้งชื่อที่แสดง (ใช้ชื่อเล่นได้) ชื่อลาย คำอธิบาย และหมวด แล้วยืนยันว่าออกแบบเองหรือได้รับอนุญาต ถ้าแก้ลายทีหลัง เปิดเมนูเดิมแล้วกด “อัปเดต” หัวใจที่ได้ยังอยู่ ถอนลายออกได้ทุกเมื่อที่หน้าบัญชี (ส่วน “ลายที่ฉันแชร์”)</p>
           <Note>คนอื่นใช้ลายของคุณได้แบบส่วนตัวและดัดแปลงต่อได้ โดยมีเครดิต “ดัดแปลงจาก … โดย …” ให้อัตโนมัติ แต่ห้ามนำไปขาย ความคืบหน้าการปักและรายการด้ายของคุณไม่ถูกแชร์ อ่านเพิ่มที่ <a className="guide-link" href="#/terms">ข้อกำหนดการแชร์</a></Note>
           <Tip>เจอลายที่เป็นงานของคนอื่นหรือไม่เหมาะสม กด <b>“แจ้งปัญหา”</b> ท้ายหน้าลาย ทีมงานจะตรวจภายใน 7 วัน</Tip>
         </>,
@@ -157,7 +157,7 @@ function useSections(): Section[] {
             <li>For 3D pieces, tap <b>Download STL</b> right on the pattern page, except designs on the team’s Stitch Box lids, which can only be <b>ordered</b>.</li>
             <li>Tap the <b>heart</b> on patterns you like (needs an account).</li>
           </ul>
-          <p><b>Share your own</b>: in the editor, open “Export / share” → <b>“Share with the community”</b> (needs you to <a className="guide-link" href="#/account">sign in</a>). Choose a display name (a nickname is fine), a title, a description and categories, and confirm you designed it or have permission. If you change the pattern later, use the same menu and tap “Update”; its likes stay. Take a pattern down any time from your Account page (“Patterns I’ve shared”).</p>
+          <p><b>Share your own</b>: in the editor, open “Export / share” → <b>“Share to the gallery”</b> (needs you to <a className="guide-link" href="#/account">sign in</a>). Choose a display name (a nickname is fine), a title, a description and categories, and confirm you designed it or have permission. If you change the pattern later, use the same menu and tap “Update”; its likes stay. Take a pattern down any time from your Account page (“Patterns I’ve shared”).</p>
           <Note>Others may use your pattern personally and remix it, with an automatic “Adapted from … by …” credit, but may not sell it. Your stitching progress and thread list are never shared. More in the <a className="guide-link" href="#/terms">sharing terms</a>.</Note>
           <Tip>Found someone else’s work or something inappropriate? Tap <b>“Report”</b> at the bottom of the pattern page; the team reviews reports within 7 days.</Tip>
         </>,

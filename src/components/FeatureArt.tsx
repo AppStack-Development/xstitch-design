@@ -3,7 +3,7 @@ import { TEMPLATES } from '../lib/templates';
 import { t } from '../lib/i18n';
 
 /**
- * Example pictures for the home page's "ทำอะไรได้บ้าง" tiles, drawn in the site's cross-stitch style:
+ * Example pictures for the home page's "ครบทุกขั้น" tiles, drawn in the site's cross-stitch style:
  * each shows the thing its tile describes (a photo turning into stitches, a grid being filled in, a stitched
  * 3D keychain, stitch mode with progress, a printed chart and thread list, community cards).
  */

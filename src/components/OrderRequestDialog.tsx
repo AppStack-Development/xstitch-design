@@ -356,7 +356,7 @@ function OrderForm({ pattern, onClose, postId }: { pattern: Pattern; onClose: ()
                   'I designed this pattern, or its owner allows it to be made, and it doesn’t use other people’s characters, logos or brands without permission')}</span>
               </label>
             )}
-            {remixed && <p className="hint">{t('เจ้าของลายในชุมชนอนุญาตให้ร้านอื่นผลิตลายนี้ได้', 'The community author lets other shops make this pattern.')}</p>}
+            {remixed && <p className="hint">{t('เจ้าของลายในแกลเลอรีอนุญาตให้ร้านอื่นผลิตลายนี้ได้', 'The pattern’s author lets other shops make it.')}</p>}
             {tried && needRights && !rights && <p className="error small">{t('ยืนยันสิทธิ์ในลายก่อน', 'Confirm the rights in this design first')}</p>}
             <label className="check order-agree">
               <input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} />
