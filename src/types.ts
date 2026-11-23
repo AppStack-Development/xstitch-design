@@ -81,7 +81,7 @@ export interface Pattern {
   postId?: string;
   /** set on a copy taken from the community gallery, so a re-share credits the original */
   remixOf?: { id: string; title: string; author: string };
-  /** set on a copy of a built-in sample (lib/samples.ts id), so opening that sample again reopens this copy */
+  /** set on copies of the old built-in samples (removed from the home page; kept so those copies still read right) */
   sampleId?: string;
 }
 

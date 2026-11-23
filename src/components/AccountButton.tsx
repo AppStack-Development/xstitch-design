@@ -56,8 +56,8 @@ export function AccountButton() {
   return (
     <a className={'btn ghost account-btn' + (loading ? ' icon-only' : ' signed-out')} href="#/account"
       title={cloudEnabled
-        ? t('ด้ายของฉัน และเข้าสู่ระบบเพื่อซิงก์ระหว่างอุปกรณ์ (ไม่บังคับ)', 'My threads, and signing in to sync across devices (optional)')
-        : t('ด้ายของฉัน', 'My threads')}
+        ? t('ลายและด้ายของฉัน และเข้าสู่ระบบเพื่อซิงก์ระหว่างอุปกรณ์ (ไม่บังคับ)', 'My patterns and threads, and signing in to sync across devices (optional)')
+        : t('ลายและด้ายของฉัน', 'My patterns and threads')}
       aria-label={mine}>
       <Icon name="user" size={16} />
       {!loading && <span className="account-label">{mine}</span>}

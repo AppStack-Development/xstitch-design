@@ -1,5 +1,5 @@
 import type { Pattern } from '../types';
-import { onTemplate, type Cell, type Legend } from '../lib/samples';
+import { onTemplate, type Cell, type Legend } from '../lib/patternArt';
 
 /**
  * Christmas designs for the Stitch Box lids (lib/boxLids.ts): three per lid, shared by the team in the

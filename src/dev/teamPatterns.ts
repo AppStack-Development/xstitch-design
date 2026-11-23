@@ -1,9 +1,9 @@
 import type { Pattern } from '../types';
-import { fabric, onTemplate, type Legend } from '../lib/samples';
+import { fabric, onTemplate, type Legend } from '../lib/patternArt';
 import { BOX_CHRISTMAS } from './boxChristmas';
 
 /**
- * Patterns the XStitch.Design team shares in the community gallery (not seasonal, unlike lib/samples.ts).
+ * Patterns the XStitch.Design team shares in the community gallery (unlike the seasonal samples that used to be on the home page).
  * Not part of the app bundle: nothing imports this file. To preview or publish, in the dev server's
  * browser console while signed in with the team account:
  *   const m = await import('/src/dev/teamPatterns.ts'); await m.publishTeamPatterns();

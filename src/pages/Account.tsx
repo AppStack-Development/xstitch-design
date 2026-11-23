@@ -14,6 +14,7 @@ import { detectInApp, externalUrl, canOpenExternally, type InAppInfo } from '../
 import { trackStep } from '../lib/analytics';
 import { USERNAME_DAYS, cleanUsername, communityEnabled, getMyCreator, myPosts, profileHref, saveMyCreator, unpublish, usernameProblem, usernameTaken, type Creator, type Post } from '../lib/community';
 import { VerifiedBadge } from '../components/PostCard';
+import { MyPatterns } from '../components/MyPatterns';
 import { amModerator, openPostCount } from '../lib/moderation';
 import { useStash } from '../lib/stash';
 import { DMC_LIBRARY } from '../lib/threads';
@@ -660,6 +661,8 @@ export function Account() {
         <LangSwitch />
       </header>
       <main className="account-main">
+        {/* patterns live in the browser, so they're here whether or not you're signed in */}
+        <MyPatterns />
         <div className="acct-col">
           {/* My threads works without an account, so it comes first for everyone who isn't signed in */}
           {cloud.status !== 'signed-in' && <ThreadsCard />}

@@ -63,7 +63,7 @@ function useSections(): Section[] {
         <>
           <p>{APP_NAME} ใช้ออกแบบลายปักแบบครอสติช (cross stitch) ทั้งบน<b>ผ้า Aida</b> และบน<b>ชิ้นงานพิมพ์ 3 มิติ</b>ที่เจาะรูไว้ให้ปัก เช่น พวงกุญแจ ที่คั่นหนังสือ หรือฝากล่อง</p>
           <ol>
-            <li>ที่หน้าแรก กด <b>“สร้างลายจากรูป”</b> (<Go to="quick">ง่ายที่สุด</Go>) หรือเลือกโหมดขั้นสูง <b>“ออกแบบอิสระ”</b> / <b>“ใช้โมเดลแม่แบบ”</b> หรือลอง<b>ลายตัวอย่าง</b> และ<Go to="community">ลายจากชุมชน</Go>ที่คนอื่นแชร์ไว้</li>
+            <li>ที่หน้าแรก กด <b>“สร้างลายจากรูป”</b> (<Go to="quick">ง่ายที่สุด</Go>) หรือเลือกโหมดขั้นสูง <b>“ออกแบบอิสระ”</b> / <b>“ใช้โมเดลแม่แบบ”</b> หรือลอง<Go to="community">ลายจากชุมชน</Go>ที่คนอื่นแชร์ไว้ ลายที่คุณสร้างหรือปักจะอยู่ใน <b>“ลายของฉัน”</b> ที่ปุ่ม <b>ของฉัน</b> มุมขวาบน</li>
             <li>เติมสีลงในช่องด้วยเครื่องมือวาด หรือแปลงจากรูปภาพ</li>
             <li>ใส่รายละเอียด เช่น ด้าย เข็ม วัสดุ ในแท็บ “รายละเอียด”</li>
             <li>พิมพ์แผนผัง แชร์ให้เพื่อน หรือเปิด <b>โหมดปัก</b> เพื่อติ๊กช่องที่ปักแล้วระหว่างปักจริง</li>
@@ -74,7 +74,7 @@ function useSections(): Section[] {
         <>
           <p>{APP_NAME} lets you design cross stitch patterns for both <b>Aida fabric</b> and <b>3D-printed pieces</b> with stitch holes, such as keychains, bookmarks or box lids.</p>
           <ol>
-            <li>On the home page, tap <b>“Pattern from a photo”</b> (<Go to="quick">the easiest way</Go>), pick an advanced mode, <b>“Free design”</b> or <b>“Use a template”</b>, or try a <b>sample pattern</b> or one of the <Go to="community">community patterns</Go> others have shared.</li>
+            <li>On the home page, tap <b>“Pattern from a photo”</b> (<Go to="quick">the easiest way</Go>), pick an advanced mode, <b>“Free design”</b> or <b>“Use a template”</b>, or try one of the <Go to="community">community patterns</Go> others have shared. Patterns you make or stitch are in <b>“My patterns”</b>, behind the <b>My stuff</b> button at the top right.</li>
             <li>Fill in the cells with the drawing tools, or convert an image.</li>
             <li>Add details such as thread, needle and materials in the “Details” tab.</li>
             <li>Print the chart, share it with a friend, or open <b>Stitch mode</b> to tick off cells as you stitch.</li>

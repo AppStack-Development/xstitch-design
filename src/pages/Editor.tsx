@@ -290,7 +290,8 @@ export function Editor({ id }: { id: string }) {
   return (
     <div className="editor">
       <header className="editor-top">
-        <a className="icon-btn" href="#/" title={t('กลับหน้าแรก', 'Back to home')}><Icon name="back" /></a>
+        {/* a pattern in My patterns goes back to that list; one only being tried goes home */}
+        <a className="icon-btn" href={dstate === 'saved' ? '#/account' : '#/'} title={dstate === 'saved' ? t('กลับไปลายของฉัน', 'Back to My patterns') : t('กลับหน้าแรก', 'Back to home')}><Icon name="back" /></a>
         <input className="name-input" value={p.name} onChange={(e) => setPattern({ ...p, name: e.target.value })} aria-label={t('ชื่อลาย', 'Pattern name')} />
         <span className={'save-state ' + saveState}>
           {dstate !== 'saved' ? t('ยังไม่บันทึก', 'Not saved') : saveState === 'saved' ? t('บันทึกแล้ว', 'Saved') : saveState === 'saving' ? t('กำลังบันทึก…', 'Saving…') : t('บันทึกไม่สำเร็จ (พื้นที่เต็ม?)', 'Save failed (storage full?)')}
